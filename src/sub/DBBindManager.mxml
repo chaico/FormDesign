@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="530" height="300" creationComplete="init()">
+	<s:layout>
+		<s:BasicLayout/>
+	</s:layout>
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+		<mx:HTTPService id="serviceField" resultFormat="text"  fault="service_faultHandler(event)"
+						url="http://localhost:8080/HSecurity/SQLField"   
+						result="onJSONLoad(event)" />
+	</fx:Declarations> 
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.serialization.json.JSONDecoder;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			import spark.events.IndexChangeEvent;
+			
+			import sys.Config;
+			private var config:Config = new Config();
+			private var loading:Loading = new Loading();
+			public var followDatasourceObj:Object;
+			public var dataSourceManager:DataSourceManager;
+			private var mainDatasourceArr:ArrayCollection;
+			private var fieldNow:ComboBox;
+			private var bindData:ArrayCollection = new ArrayCollection();
+			private function init():void{
+				titleWindow.addEventListener(CloseEvent.CLOSE, titleWindow_close);
+				mainDatasourceArr= new ArrayCollection();
+				for(var i:int=0;i<dataSourceManager.dataSourceArr.length;i++){
+					var name:String =dataSourceManager.dataSourceArr[i]["name"];
+					if(name!=followDatasourceObj["name"]){
+						var sqlvalue:String =dataSourceManager.dataSourceArr[i]["sqlvalue"];
+						var database:String =dataSourceManager.dataSourceArr[i]["database"];
+						mainDatasourceArr.addItem({label:name,data:name,sqlvalue:sqlvalue,database:database});
+					}
+				}
+				mainDatasourcename.dataProvider = mainDatasourceArr;
+				//初始值
+				var tmp:ArrayCollection = dataSourceManager.dataSourceArr[dataSourceManager.t_dataGrid.selectedIndex]["bind"] as ArrayCollection;
+				if(tmp!=null){
+					bindData = tmp;
+					t_dataGrid.dataProvider = bindData;
+					if(bindData.length>0){
+						for(var i:int=0;i<mainDatasourceArr.length;i++){
+							if(bindData[i].mainDatasourcename==mainDatasourceArr[i].data){
+								mainDatasourcename.selectedIndex=i;
+								break;
+							}
+						}
+					}
+				}
+				titleWindow.isPopUp = true;
+			}
+			protected function okBtn_clickHandler(event:MouseEvent):void
+			{
+				// 
+				dataSourceManager.dataSourceArr[dataSourceManager.t_dataGrid.selectedIndex]["bind"]= bindData;
+				this.titleWindow_close();
+			}
+			
+			protected function cancelBtn_clickHandler(event:MouseEvent):void
+			{
+				this.titleWindow_close();
+			}
+			//关闭弹出对话框
+			private function titleWindow_close(event:CloseEvent=null):void { 
+				PopUpManager.removePopUp(this); 
+			}
+			public function FieldSend():void{
+				
+				PopUpManager.addPopUp(loading, this, true); 
+				PopUpManager.centerPopUp(loading); 
+				serviceField.url = config.webURL+"/SQLField";
+				var params:Object = new Object();
+				if(fieldNow==mainField){
+					params["dataBase"] = mainDatasourcename.selectedItem.database;
+					params["sql"] = mainDatasourcename.selectedItem.sqlvalue;
+				}else{
+					params["dataBase"] = followDatasourceObj["database"];
+					params["sql"] = followDatasourceObj["sqlvalue"];
+				}
+				params["time"] = new Date().date;
+				serviceField.method="POST";
+				serviceField.send(params);
+			}
+			private function onJSONLoad(event:ResultEvent):void  
+			{   
+				
+				try{
+					var rawData:String = String(event.result);  
+					var json :JSONDecoder = new JSONDecoder(rawData);
+					if(json.getObject().success==0){
+						Alert.show(json.getObject().errorMSG);
+					}else{
+						var array:Array = json.getObject().fields ;
+						var fields: ArrayCollection = new ArrayCollection();
+						for(var i:int=0;i<array.length;i++){
+							fields.addItem({label:array[i], data:array[i]});
+						}
+						fieldNow.dataProvider =fields; 
+					}
+				}catch(e:*){
+					Alert.show("系统错误"+e);
+				}				
+				PopUpManager.removePopUp(loading);
+			}   
+			protected function service_faultHandler(event:FaultEvent):void
+			{
+				Alert.show("Web连接出错!");
+				PopUpManager.removePopUp(loading);
+			}
+
+			protected function mainDatasourcename_changeHandler(event:IndexChangeEvent):void
+			{
+				fieldNow = mainField;
+				FieldSend();
+				
+				bindData.removeAll();
+				t_dataGrid.dataProvider = bindData;
+			}
+
+
+			protected function followField_focusInHandler(event:*):void
+			{
+				fieldNow = followField;
+				if(followField.dataProvider==null){
+					FieldSend();
+				}
+			}
+
+
+
+			protected function addBind_clickHandler(event:MouseEvent):void
+			{
+				if(mainField.selectedIndex==-1 ){
+					Alert.show("请选择主数据源字段！");
+					return;
+				}
+				if(followField.selectedIndex==-1 ){
+					Alert.show("请选择从数据源字段！");
+					return;
+				}
+				for(var i:int=0;i<bindData.length;i++){
+					if(mainField.selectedItem.data==bindData[i].mainField){
+						Alert.show("主数据源关联字段已经存在！");
+						return;
+					}
+					if(followField.selectedItem.data==bindData[i].followField){
+						Alert.show("从数据源关联字段已经存在！");
+						return;
+					}
+				}
+				bindData.addItem({mainDatasourcename:mainDatasourcename.selectedItem.data,
+									mainField:mainField.selectedItem.data,
+									followDatasourcename:followDatasourceObj["name"],
+									followField:followField.selectedItem.data});
+				t_dataGrid.dataProvider = bindData;
+			}
+
+
+			protected function removeBtn_clickHandler(event:MouseEvent):void
+			{
+				if(t_dataGrid.selectedIndex!=-1){
+					bindData.removeItemAt(t_dataGrid.selectedIndex);
+					t_dataGrid.dataProvider = bindData;
+				}
+			}
+
+
+			protected function mainField_focusInHandler(event:*):void
+			{
+				fieldNow = mainField;
+				if(mainField.dataProvider==null){
+					FieldSend();
+				}
+			}
+
+		]]>
+	</fx:Script>
+	<s:TitleWindow x="0" y="0" width="100%" height="100%" title="关联字段"  id="titleWindow">
+		<s:Label x="9" y="14" text="主数据源:"/>
+		<s:ComboBox x="85" y="2" id="mainDatasourcename"  change="mainDatasourcename_changeHandler(event)"/>
+		<s:Label x="8" y="44" text="主数据源字段:"/>
+		<s:ComboBox x="85" y="33" id="mainField" click="mainField_focusInHandler(event)" focusIn="mainField_focusInHandler(event)"/>
+		<s:Label x="234" y="44" text="从数据源字段:"/>
+		<s:ComboBox x="313" y="33" id="followField" click="followField_focusInHandler(event)" focusIn="followField_focusInHandler(event)"/>
+		<s:Button x="463" y="34" label="增加" width="51" id="addBind" click="addBind_clickHandler(event)"/>
+		<mx:DataGrid x="0" y="64" height="168" width="100%" id="t_dataGrid" dataProvider="{bindData}">
+			<mx:columns>
+				<mx:DataGridColumn headerText="主数据源字段" dataField="mainField"/>
+				<mx:DataGridColumn headerText="从数据源字段" dataField="followField"/>
+			</mx:columns>
+		</mx:DataGrid>
+		<s:Button x="6" y="240" label="删除" width="51" id="removeBtn" click="removeBtn_clickHandler(event)"/>
+		<s:Button x="367" y="240" label="确定" id="okBtn"  click="okBtn_clickHandler(event)"/>
+		<s:Button x="445" y="240" label="取消"  id="cancelBtn" click="cancelBtn_clickHandler(event)"/>
+	</s:TitleWindow>
+</s:Group>

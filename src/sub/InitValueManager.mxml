@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="500" height="320" creationComplete="init()">
+	<s:layout>
+		<s:BasicLayout/>
+	</s:layout>
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.managers.IFocusManager;
+			import mx.managers.PopUpManager;
+			
+			public var t_Obj:Object;
+			public var formDesign:FormDesign;
+			public var sourceData: XMLList; /*= new ArrayCollection(  
+				[  
+					{source:"SEQ",remark:"从数据库中取得序列,如:SEQ(userinfo_seq)"},
+					{source:"sysIndex",remark:"从1开始自动增长"},
+					{source:"sysQXH",remark:"区县号"},
+					{source:"sysLoginUserid",remark:"登录用户ID"}]);*/
+			private function init():void{
+				sourceData = formDesign.config.sourceData
+				dataGrid.dataProvider = sourceData;
+				titleWindow.addEventListener(CloseEvent.CLOSE, titleWindow_close);
+				titleWindow.isPopUp = true;
+				addEventListener(FlexEvent.UPDATE_COMPLETE,function():void{
+					t_value.text = t_Obj.value;
+				});
+			}
+			//关闭弹出对话框
+			private function titleWindow_close(event:CloseEvent=null):void { 
+				PopUpManager.removePopUp(this); 
+			} 
+			
+			
+
+			protected function dataGrid_clickHandler(event:MouseEvent):void
+			{
+				if(dataGrid.selectedItem!=null){
+					if(dataGrid.selectedItem.@name=="SEQ"){
+						t_value.text = dataGrid.selectedItem.@name+"()";
+						t_value.setFocus();
+						t_value.selectRange(4,4); 
+					}else{
+						t_value.text = dataGrid.selectedItem.@name;
+					}
+				}
+			}
+
+
+			protected function okBtn_clickHandler(event:MouseEvent):void
+			{
+				formDesign.setPropertie(t_Obj.id,t_value.text)
+				formDesign.onGridEdit(t_Obj);
+				
+				formDesign.dgProp.invalidateList();
+				this.titleWindow_close(null);
+			}
+
+
+			protected function cancelBtn_clickHandler(event:MouseEvent):void
+			{
+				this.titleWindow_close(null);
+			}
+
+		]]>
+	</fx:Script>
+	<s:TitleWindow x="0" y="0" width="100%" height="100%" title="初始值设定" id ="titleWindow">
+		<s:TextArea x="13" y="23" width="475" height="53" id="t_value"/>
+		<s:Label x="13" y="8" text="表达式："/>
+		<mx:DataGrid x="13" y="88" width="475" height="169" editable="false" id="dataGrid" click="dataGrid_clickHandler(event)">
+			<mx:columns>
+				<mx:DataGridColumn headerText="来源" dataField="@name" width="150"/>
+				<mx:DataGridColumn headerText="说明" dataField="@remark"/>
+			</mx:columns>
+			<mx:dataProvider>
+				{sourceData}
+			</mx:dataProvider>
+		</mx:DataGrid>
+		<s:Button x="337" y="261" label="确定" id="okBtn" click="okBtn_clickHandler(event)"/>
+		<s:Button x="415" y="261" label="取消" id="cancelBtn" click="cancelBtn_clickHandler(event)"/>
+	</s:TitleWindow>
+</s:Group>

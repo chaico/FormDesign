@@ -1,0 +1,425 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="568" height="358" creationComplete="init()">
+	<s:layout>
+		<s:BasicLayout/>
+	</s:layout>
+	<fx:Script>
+		<![CDATA[
+			import components.InputField;
+			import components.InputLabel;
+			import components.STButton;
+			import components.STCheckBox;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.XMLListCollection;
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.events.DataGridEvent;
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			
+			import spark.events.IndexChangeEvent;
+			
+			import tags.Table;
+			import tags.Td;
+			import tags.Tr;
+			public var formDesign:FormDesign;
+			public var alignData: ArrayCollection = new ArrayCollection(  
+				[  
+					{label:"left"},    
+					{label:"center"} ,
+					{label:"right"}]);
+			private var filedDataGridData:ArrayCollection = new ArrayCollection();
+			private function init():void{
+				titleWindow.addEventListener(CloseEvent.CLOSE, titleWindow_close);
+				dataSource.dataProvider = formDesign.getDataSourceByArrayCollection();
+				dataSource.labelField = "label";
+				dataSource.selectedIndex=-1;
+				titleWindow.isPopUp = true;
+				
+			}
+
+			protected function dataSource_changeHandler(event:IndexChangeEvent):void
+			{
+				
+				if(dataSource.selectedItem!=null){
+					try{
+						fieldList.dataProvider = new XMLListCollection(formDesign.getFieldByXMLList(dataSource.selectedItem.data).copy());
+						fieldList.labelField="@name";
+						filedDataGridData = new ArrayCollection();
+						filedDataGrid.dataProvider = filedDataGridData;
+						filedDataGrid.invalidateList();
+						//fieldList.dataType = "@dataType";
+						//fieldList.dataDisplaySize   = "@dataDisplaySize";
+					}catch(e:*){
+					}
+				}	
+			}
+			
+			//关闭弹出对话框
+			private function titleWindow_close(event:CloseEvent=null):void { 
+				PopUpManager.removePopUp(this); 
+				//parentDocument.SQLTmp.text = "";
+			} 
+			
+			protected function button1_clickHandler(event:MouseEvent):void
+			{
+				if(dataSource.selectedItem!=null){
+					
+					var idx:Number=0;
+					var cols:Number = filedDataGridData.length;
+					if(addDeleteOperateChk.selected==true){
+						idx++;
+						cols++;
+					}
+					var table:Table =  formDesign.addTableOK(3,cols);
+					table.isDataGrid=true;
+					table.source = dataSource.selectedItem.data;
+					var buttonAddFlag:Boolean;
+					table.addEventListener(FlexEvent.CREATION_COMPLETE,function():void{
+						
+						if(!buttonAddFlag && addDeleteOperateChk.selected==true){
+							buttonAddFlag=true;
+							var tr0:Tr = table.getChildAt(0) as Tr;
+							var td0:Td = tr0.getChildAt(0) as Td;
+							table.selectedTd = new Array();
+							for(var i:int=0;i<tr0.numChildren;i++){
+								var td:Td = tr0.getChildAt(i) as Td;
+								table.maxSelectedWidth+=td.width;
+								table.selectedTd[table.selectedTd.length] = td;
+							}
+							table.maxColSpan = tr0.numChildren;
+							table.maxRowSpan=1;
+							table.merge();
+							var addButton:STButton = formDesign.addModule(td0.getChildAt(0),3) as STButton;
+							addButton.label = "增加";
+							addButton.width = 50;
+							addButton.btnType="Add";
+							
+							var deleteButton:STButton = formDesign.addModule(td0.getChildAt(0),3) as STButton;
+							deleteButton.label = "删除";
+							deleteButton.width = 50;
+							deleteButton.btnType="Delete";
+							deleteButton.x = 45;
+							deleteButton.y = 0;
+							
+							tr0.height=31;
+						}
+					});
+					var tr1:Tr = table.getChildAt(idx) as Tr;
+					idx++;
+					var tr2:Tr = table.getChildAt(idx) as Tr;
+					tr2.isDataGridDetail=true
+					if(addDeleteOperateChk.selected==true){
+						
+						var td1:Td = tr1.getChildAt(0) as Td;
+						var td2:Td = tr2.getChildAt(0) as Td;
+						
+						var stCheckBox1:STCheckBox = formDesign.addModule(td1.getChildAt(0),4) as STCheckBox;
+						stCheckBox1.label="";
+						stCheckBox1.width=20;
+						stCheckBox1.selectedAllChild = true;
+						stCheckBox1.otherChildPropertie =dataSource.selectedItem.data+"_Chk";
+						
+						var stCheckBox2:STCheckBox = formDesign.addModule(td2.getChildAt(0),4) as STCheckBox;
+						stCheckBox2.label="";
+						stCheckBox2.width=20;
+						stCheckBox2.childPropertie = dataSource.selectedItem.data+"_Chk";
+						
+						td1.width=20;
+						td2.width=20;
+					}
+					
+					for(var i:int=0;i<filedDataGridData.length;i++){
+						var item:Object = filedDataGridData[i];
+						var addLIIdx:Number =i;
+						if(addDeleteOperateChk.selected==true){
+							addLIIdx++;
+						}
+						var td1:Td = tr1.getChildAt(addLIIdx) as Td;
+						var td2:Td = tr2.getChildAt(addLIIdx) as Td;
+						if(item.width!=""){
+							td1.width = item.width;
+						}
+						
+						//标题
+						var inputLabel:InputLabel = formDesign.addModule(td1.getChildAt(0),0) as InputLabel;
+						inputLabel.height=25;
+						if(item.fieldName==""){
+							inputLabel.text = item.field;
+						}else{
+							inputLabel.text = item.fieldName;
+						}
+						inputLabel.width = td1.width;
+						
+						//Field
+						var inputField:InputField = formDesign.addModule(td2.getChildAt(0),1) as InputField;
+						inputField.source = dataSource.selectedItem.data;
+						inputField.field = item.field;
+						inputField.dataType = item.dataType;
+						inputField.dataDisplaySize = item.dataDisplaySize;
+						inputField.inputFieldName = dataSource.selectedItem.data+"_"+item.field;
+						inputField.width = td1.width;
+						inputLabel.textAlign = item.align;
+						inputField.textAlign = item.align;
+					}
+				}
+				this.titleWindow_close();
+				
+			}
+			protected function button2_clickHandler(event:MouseEvent):void
+			{
+				this.titleWindow_close();
+				
+			}
+
+			protected function leftMove_clickHandler(event:MouseEvent):void
+			{
+				if(fieldList.selectedItems!=null && fieldList.selectedItems.length>0){
+					for(var i:int=0;i<fieldList.selectedItems.length;i++){
+						var selectedItem:Object =fieldList.selectedItems[i];
+						filedDataGridData.addItem({row:filedDataGridData.length+1,field:selectedItem.@name,fieldName:"",width:"",align:"",dataType:selectedItem.@dataType,dataDisplaySize:selectedItem.@dataDisplaySize});
+					}
+					
+					for(var i:int=0;i<fieldList.selectedItems.length;i++){
+						var selectedItem:Object =fieldList.selectedItems[i];
+						for(var n:int=0;n<fieldList.dataProvider.length;n++){
+							if(fieldList.dataProvider[n]==selectedItem){
+								fieldList.dataProvider.removeItemAt(n);
+								i--;
+								break;
+							}
+						}
+					}
+					filedDataGrid.dataProvider = filedDataGridData;
+				}
+			}
+
+
+			protected function leftMoveAll_clickHandler(event:MouseEvent):void
+			{
+				if(fieldList.dataProvider!=null && fieldList.dataProvider.length>0){
+					for(var n:int=0;n<fieldList.dataProvider.length;n++){
+						var selectedItem:Object =fieldList.dataProvider[n];
+						filedDataGridData.addItem({row:filedDataGridData.length+1,field:selectedItem.@name,fieldName:"",width:"",align:"",dataType:selectedItem.@dataType,dataDisplaySize:selectedItem.@dataDisplaySize});
+						fieldList.dataProvider.removeItemAt(n);
+						n--;
+					}
+					filedDataGrid.dataProvider = filedDataGridData;
+				}
+			}
+
+
+			protected function rightMove_clickHandler(event:MouseEvent):void
+			{
+				if(filedDataGrid.selectedItems!=null && filedDataGrid.selectedItems.length>0){
+					for(var i:int=0;i<filedDataGrid.selectedItems.length;i++){
+						var selectedItem:Object =filedDataGrid.selectedItems[i];
+						var xml:XML = XML("<field name='"+selectedItem.field+"'/>");
+						fieldList.dataProvider.addItem(xml);
+					}
+					for(var i:int=0;i<filedDataGrid.selectedItems.length;i++){
+						var selectedItem:Object =filedDataGrid.selectedItems[i];
+						for(var n:int=0;n<filedDataGrid.dataProvider.length;n++){
+							if(filedDataGrid.dataProvider[n]==selectedItem){
+								filedDataGrid.dataProvider.removeItemAt(n);
+								i--;
+								break;
+							}
+						}
+					}
+				}
+				
+				this.setFiledDataGridRow();
+			}
+
+
+			protected function rightMoveAll_clickHandler(event:MouseEvent):void
+			{
+				
+				if(filedDataGrid.dataProvider!=null && filedDataGrid.dataProvider.length>0){
+					for(var n:int=0;n<filedDataGrid.dataProvider.length;n++){
+						var selectedItem:Object =filedDataGrid.dataProvider[n];
+						var xml:XML = XML("<field name='"+selectedItem.field+"'/>");
+						fieldList.dataProvider.addItem(xml);
+						filedDataGrid.dataProvider.removeItemAt(n);
+						n--;
+					}
+				}
+				this.setFiledDataGridRow();
+			}
+			public function setFiledDataGridRow():void{
+				if(filedDataGrid.dataProvider!=null && filedDataGrid.dataProvider.length>0){
+					for(var n:int=0;n<filedDataGrid.dataProvider.length;n++){
+						filedDataGrid.dataProvider[n].row = n+1;
+					}
+				}
+				
+			}
+			
+			protected function upMoveBtn_clickHandler(event:MouseEvent):void
+			{
+				if(filedDataGrid.selectedIndex==0){
+					return;
+				}
+				var selectedIndex:Number = filedDataGrid.selectedIndex;
+				var selectedItem:Object = filedDataGrid.selectedItem;
+				var vsp:Number = filedDataGrid.verticalScrollPosition;
+				var dataArrTmp:ArrayCollection = new ArrayCollection();
+				for(var i:int=0;i<filedDataGridData.length;i++){
+					if(i+1==filedDataGrid.selectedIndex){
+						dataArrTmp.addItem(filedDataGridData[i+1]);
+					}else if(i==filedDataGrid.selectedIndex){
+						dataArrTmp.addItem(filedDataGridData[i-1]);
+					}else{
+						dataArrTmp.addItem(filedDataGridData[i]);
+					}
+				}
+				filedDataGridData  = dataArrTmp;
+				//this.loadData();
+				filedDataGrid.dataProvider = filedDataGridData;
+				filedDataGrid.selectedItem=selectedItem;
+				filedDataGrid.verticalScrollPosition  = vsp;
+				this.setFiledDataGridRow();
+			}
+			
+			
+			protected function downMoveBtn_clickHandler(event:MouseEvent):void
+			{
+				
+				if(filedDataGrid.selectedItem==null 
+					|| filedDataGrid.selectedIndex==filedDataGridData.length-1){
+					return;
+				}
+				var selectedIndex:Number = filedDataGrid.selectedIndex;
+				var selectedItem:Object = filedDataGrid.selectedItem;
+				var vsp:Number = filedDataGrid.verticalScrollPosition;
+				var dataArrTmp:ArrayCollection = new ArrayCollection();
+				for(var i:int=0;i<filedDataGridData.length;i++){
+					if(i-1==filedDataGrid.selectedIndex){
+						dataArrTmp.addItem(filedDataGridData[i-1]);
+					}else if(i==filedDataGrid.selectedIndex){
+						dataArrTmp.addItem(filedDataGridData[i+1]);
+					}else{
+						dataArrTmp.addItem(filedDataGridData[i]);
+					}
+				}
+				filedDataGridData  = dataArrTmp;
+				//this.loadData();
+				filedDataGrid.dataProvider = filedDataGridData;
+				filedDataGrid.selectedItem=selectedItem;
+				filedDataGrid.verticalScrollPosition  = vsp;
+				this.setFiledDataGridRow();
+			}
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<s:TitleWindow x="0" y="0" width="100%" height="100%" title="添加DataGrid" id="titleWindow" >
+		<s:Label x="10" y="19" text="数据源："/>
+		<s:ComboBox x="66" y="10" id="dataSource" change="dataSource_changeHandler(event)"/>
+		
+		<mx:DataGrid x="165" y="41" width="391" height="254" 
+					 editable="true"  allowMultipleSelection="true" sortableColumns="false" 
+					 id="filedDataGrid"   >
+			<mx:columns>
+				<mx:DataGridColumn headerText="序号" 	dataField="row" width="40" editable="false" />
+				<mx:DataGridColumn headerText="字段名" 	dataField="field" width="100" editable="false" />
+				<mx:DataGridColumn headerText="显示名" 	dataField="fieldName"  width="110"  >
+					<mx:itemEditor>
+						<fx:Component>
+							<mx:HBox>
+								<fx:Script>
+									<![CDATA[
+										public function get text():Object{
+											
+											return textInputFieldName.text;
+										}
+										override public function set data(value:Object):void{
+											textInputFieldName.text = value.fieldName;
+											textInputFieldName.setFocus();
+										}
+
+										protected function textInputFieldName_focusInHandler(event:FocusEvent):void
+										{
+											IME.enabled=true;
+										}
+
+									]]>
+									
+								</fx:Script>
+								<s:TextInput width="100%" id="textInputFieldName" focusIn="textInputFieldName_focusInHandler(event)"  maxChars="20"/>
+							</mx:HBox>
+						</fx:Component>
+					</mx:itemEditor>
+				</mx:DataGridColumn>
+				<mx:DataGridColumn headerText="列宽" 	dataField="width" width="50"  >
+					<mx:itemEditor>
+						<fx:Component>
+							<mx:HBox>
+								<fx:Script>
+									<![CDATA[
+										public function get text():Object{
+											
+											return textInputWidth.text;
+										}
+										override public function set data(value:Object):void{
+											textInputWidth.text = value.width;
+											textInputWidth.setFocus();
+										}
+									]]>
+									
+								</fx:Script>
+								<s:TextInput width="100%" id="textInputWidth"  restrict="0-9/^" maxChars="3"/>
+							</mx:HBox>
+						</fx:Component>
+					</mx:itemEditor>
+				</mx:DataGridColumn>
+				<mx:DataGridColumn headerText="对齐方式" dataField="align" width="90" >
+					<mx:itemEditor>
+						<fx:Component>
+							<mx:HBox>
+								<fx:Script>
+									<![CDATA[
+										public function get text():Object{
+											if(comboBox.selectedItem!=null){
+												return comboBox.selectedItem.label;
+											}
+											return null;
+										}
+										override public function set data(value:Object):void{
+											comboBox.selectedIndex=-1;
+											for each(var iterm:Object in comboBox.dataProvider){
+												if(iterm.label == value.align){
+													comboBox.selectedItem = iterm;
+												}
+											}
+										}										
+									]]>
+								</fx:Script>
+								<mx:ComboBox id="comboBox" width="100%" dataProvider="{outerDocument.alignData}"/>
+							</mx:HBox>
+						</fx:Component>
+					</mx:itemEditor>
+				</mx:DataGridColumn>
+			</mx:columns>
+			<mx:dataProvider>
+				{filedDataGridData}
+			</mx:dataProvider>
+		</mx:DataGrid>
+		
+		<s:List x="10" y="42" height="254" width="103" id="fieldList" allowMultipleSelection="true"></s:List>
+		<s:Button x="119" y="116" label="&gt;" width="41" id="leftMove" click="leftMove_clickHandler(event)"/>
+		<s:Button x="119" y="139" label="&gt;&gt;" width="41" id="leftMoveAll" click="leftMoveAll_clickHandler(event)"/>
+		<s:Button x="119" y="177" label="&lt;" width="41" id="rightMove" click="rightMove_clickHandler(event)"/>
+		<s:Button x="119" y="200" label="&lt;&lt;" width="41" id="rightMoveAll" click="rightMoveAll_clickHandler(event)"/>
+		<s:Button x="169" y="300" label="上移" width="47" id="upMoveBtn"   click="upMoveBtn_clickHandler(event)"/>
+		<s:Button x="219" y="300" label="下移" width="47" id="downMoveBtn"  click="downMoveBtn_clickHandler(event)"/>
+		<s:Button x="391" y="300" label="确定" click="button1_clickHandler(event)"/>
+		<s:Button x="487" y="300" label="取消" click="button2_clickHandler(event)"/>
+		<s:CheckBox x="229" y="15" label="增删操作" id="addDeleteOperateChk"/>
+	</s:TitleWindow>
+</s:Group>

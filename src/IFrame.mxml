@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml"
+    resize="callLater(moveIFrame)"
+    move="callLater(moveIFrame)">
+
+    <mx:Script>
+    <![CDATA[
+
+        import flash.external.ExternalInterface;
+        import flash.geom.Point;
+        import flash.net.navigateToURL;
+
+        private var __source: String;
+
+        /**
+         * Move iframe through ExternalInterface.  The location is determined using localToGlobal()
+         * on a Point in the Canvas.
+         **/
+        private function moveIFrame(): void
+        {
+
+            var localPt:Point = new Point(0, 0);
+            var globalPt:Point = this.localToGlobal(localPt);
+
+            ExternalInterface.call("moveIFrame", globalPt.x, globalPt.y, this.width, this.height);
+        }
+
+        /**
+         * The source URL for the IFrame.  When set, the URL is loaded through ExternalInterface.
+         **/
+        public function set source(source: String): void
+        {
+            if (source)
+            {
+
+                if (! ExternalInterface.available)
+                {
+                    throw new Error("ExternalInterface is not available in this container. Internet Explorer ActiveX, Firefox, Mozilla 1.7.5 and greater, or other browsers that support NPRuntime are required.");
+                }
+                __source = source;
+                ExternalInterface.call("loadIFrame", source);
+                moveIFrame();
+            }
+        }
+
+        public function get source(): String
+        {
+            return __source;
+        }
+
+        /**
+         * Whether the IFrame is visible.  
+         **/
+        override public function set visible(visible: Boolean): void
+        {
+            super.visible=visible;
+
+            if (visible)
+            {
+                ExternalInterface.call("showIFrame");
+            }
+            else 
+            {
+                ExternalInterface.call("hideIFrame");
+            }
+        }
+
+    ]]>
+    </mx:Script>
+
+</mx:Canvas>

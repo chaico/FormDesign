@@ -1,0 +1,55 @@
+<!-- saved from url=(0014)about:internet -->
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache"> 
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-cache"> 
+<META HTTP-EQUIV="Expires" CONTENT="Mon, 04 Dec 1999 21:29:02 GMT">
+<META HTTP-EQUIV="Expires" CONTENT="0"> 
+<title>SUNTOWN表单自定义</title>
+<script src="swfobject.js" type="text/javascript"></script>
+<body scroll="no" leftMargin="0" topMargin="0">
+
+<div id="flashobject" name="flashobject"></div>
+<script type="text/javascript">
+
+function moveIFrame(x,y,w,h) {
+    var frameRef=document.getElementById("myFrame");
+    frameRef.style.left=x;
+    frameRef.style.top=y;
+    var iFrameRef=document.getElementById("myIFrame");	
+	iFrameRef.width=w;
+	iFrameRef.height=h;
+}
+
+function hideIFrame(){
+    document.getElementById("myFrame").style.visibility="hidden";
+}
+	
+function showIFrame(){
+    document.getElementById("myFrame").style.visibility="visible";
+}
+
+function loadIFrame(url){
+	document.getElementById("myFrame").innerHTML = "<iframe id='myIFrame' src='" + url + "'frameborder='0'></iframe>";
+}
+
+</script>
+
+<script type="text/javascript">
+	var _ST=new Date().getMilliseconds();
+
+	var so = new SWFObject("${swf}.swf?_ST="+_ST, "live", "100%", "100%", "8", "#FFFFFF");
+	so.addParam("quality", "high");
+	so.addParam("allowScriptAccess", "always");
+	so.useExpressInstall("expressinstall.swf?_ST="+_ST);
+	so.write("flashobject");
+</script>
+
+<!--
+<iframe name="_history" src="history.htm" frameborder="0" scrolling="no" width="22" height="0"></iframe>
+-->
+<div id="myFrame" style="position:absolute;background-color:transparent;border:0px;visibility:hidden;"></div>
+
+</body>
+</html>

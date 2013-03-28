@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas creationComplete="onInitialize(event)" resize="onInitialize(event)" xmlns:mx="http://www.adobe.com/2006/mxml">
+	<mx:Script>
+		<![CDATA[
+			private static var grapWidth: Number = 30;
+			
+			internal function onInitialize(event: Event): void{
+				this.graphics.clear();
+				//this.label="视图";
+				//填充背景
+				this.graphics.beginFill(0xFFFFFF);
+				this.graphics.drawRect(0, 0, this.width, this.height);
+				this.graphics.endFill();
+				
+				this.graphics.lineStyle(1, 0xBBBBBB);
+				//画横线
+				var i : int = 0;
+				var totalLength: Number = 0;
+				while(totalLength < this.height-1){
+					this.graphics.moveTo(0, grapWidth * i);
+					this.graphics.lineTo(this.width, grapWidth * i);
+					totalLength = grapWidth * i;
+					i ++;
+				}
+				
+				//变量清零
+				totalLength = 0;
+				i = 0;
+				
+				//画竖线
+				while(totalLength < this.width){
+					this.graphics.moveTo(grapWidth * i, 0);
+					this.graphics.lineTo(grapWidth * i, this.height );
+					totalLength = grapWidth * i;
+					i ++;
+				}
+			}
+		]]>
+	</mx:Script>
+</mx:Canvas>

@@ -1,0 +1,592 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx"  width="279" height="400" creationComplete="init()" height.tableState="374" width.tableState="431" width.viewState="431" height.viewState="374"   width.sqlState="431" height.sqlState="374">
+	<s:layout>
+		<s:BasicLayout/>
+	</s:layout>
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+		<mx:HTTPService id="serviceTable" resultFormat="text"  fault="service_faultHandler(event)"
+						url="http://localhost:8080/HSecurity/SQLTable"   
+						result="onJSONLoadByTable(event)" />
+		<mx:HTTPService id="serviceView" resultFormat="text"  fault="service_faultHandler(event)"
+						url="http://localhost:8080/HSecurity/SQLView"   
+						result="onJSONLoadByView(event)" />
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.serialization.json.JSONDecoder;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			import spark.events.IndexChangeEvent;
+			
+			import sys.Config;
+			private var dataSource: ArrayCollection = new ArrayCollection(  
+				[{label:"表", data:1},   
+					{label:"视图", data:2},   
+					{label:"自定义SQL", data:3} ]);
+			public var conditionData: ArrayCollection = new ArrayCollection(  
+				[{label:"=", data:"="},   
+					{label:"<", data:"&lt;"},   
+					{label:">", data:"&gt;"},   
+					{label:"<>", data:"&lt;&gt;"} ,   
+					{label:"like", data:"like"}  ]);
+			public var dataBaseArr: ArrayCollection = new ArrayCollection();
+			private var config:Config = new Config();
+			private var focusDataSourceTable:Number=0;
+			private var focusDataSourceView:Number=0;
+			private var loading:Loading = new Loading();
+			public var editIndex:Number=-1;
+			public var dataSourceManager:DataSourceManager;
+			public var initData: ArrayCollection = new ArrayCollection();
+			public var sql:String;
+			private function init():void{
+				titleWindow.addEventListener(CloseEvent.CLOSE, titleWindow_close);
+				currentState = "tableState";
+				if(dataBase.selectedIndex==-1){
+					dataBase.selectedIndex=0;
+				}
+				if(dataSourceFrom.selectedIndex==-1){
+					dataSourceFrom.selectedIndex=0;
+				}
+				titleWindow.isPopUp = true;
+			}
+			//关闭弹出对话框
+			private function titleWindow_close(event:CloseEvent=null):void { 
+				PopUpManager.removePopUp(this); 
+				//parentDocument.SQLTmp.text = "";
+			} 
+
+			protected function combobox1_changeHandler(event:IndexChangeEvent):void
+			{
+				main.selected=false;
+				sql="";
+				
+				try{
+					dataBaseTable.selectedIndex=-1;
+				}catch(e:*){
+				}
+				try{
+					dataBaseView.selectedIndex=-1;
+				}catch(e:*){
+				}
+				if(dataSourceFrom.selectedItem.data==1){
+					currentState = "tableState";
+				}else if(dataSourceFrom.selectedItem.data==2){
+					currentState = "viewState";
+				}else if(dataSourceFrom.selectedItem.data==3){
+					currentState = "sqlState";
+				}
+				dataSourceName.text="";
+			}
+
+
+			protected function sqlBtn_clickHandler(event:MouseEvent):void
+			{
+				if(this.checkDataBase()==false){
+					return;
+				}
+				var dsa:SQL = new SQL();
+				dsa.dataSourceAdd = this;
+				dsa.dataBase = dataBase.selectedItem.data;
+				PopUpManager.addPopUp(dsa, parentDocument.hdbox, true); 
+				PopUpManager.centerPopUp(dsa); 
+				dsa.sqlTextArea.text = sql;
+			}
+			public function TableSend():void{
+				
+				if(dataBase.selectedItem!=null){
+					serviceTable.url = config.webURL+"/SQLTable";
+					var params:Object = new Object();
+					params["dataBase"] = dataBase.selectedItem.data;
+					params["time"] = new Date().date;
+					serviceTable.method="POST";
+					serviceTable.send(params);
+				}
+			}
+			public function ViewSend():void{
+				
+				if(dataBase.selectedItem!=null){
+					serviceView.url = config.webURL+"/SQLView";
+					var params:Object = new Object();
+					params["dataBase"] = dataBase.selectedItem.data;
+					params["time"] = new Date().date;
+					serviceView.method="POST";
+					serviceView.send(params);
+				}
+			}
+			private function onJSONLoadByTable(event:ResultEvent):void  
+			{   
+				
+				try{
+					var rawData:String = String(event.result);  
+					var json :JSONDecoder = new JSONDecoder(rawData);
+					if(json.getObject().success==0){
+						Alert.show(json.getObject().errorMSG);
+					}else{
+						var array:Array = json.getObject().tables ;
+						var tables: ArrayCollection = new ArrayCollection();
+						var selectedIndex = -1;
+						for(var i:int=0;i<array.length;i++){
+							tables.addItem({label:array[i], data:array[i]});
+							if(dataBaseTable.textInput.text ==array[i] ){
+								selectedIndex = i;
+							}
+						}
+						dataBaseTable.dataProvider =tables; 
+						dataBaseTable.selectedIndex = selectedIndex;
+					}
+				}catch(e:*){
+					Alert.show("系统错误");
+				}
+				PopUpManager.removePopUp(loading);
+				
+			} 
+			private function onJSONLoadByView(event:ResultEvent):void  
+			{   
+				
+				try{
+					var rawData:String = String(event.result);  
+					var json :JSONDecoder = new JSONDecoder(rawData);
+					if(json.getObject().success==0){
+						Alert.show(json.getObject().errorMSG);
+					}else{
+						var array:Array = json.getObject().views ;
+						var views: ArrayCollection = new ArrayCollection();
+						var selectedIndex = -1;
+						for(var i:int=0;i<array.length;i++){
+							views.addItem({label:array[i], data:array[i]});
+							if(dataBaseView.textInput.text ==array[i] ){
+								selectedIndex = i;
+							}
+						}
+						dataBaseView.dataProvider =views; 
+						dataBaseView.selectedIndex = selectedIndex;
+					}
+				}catch(e:*){
+					Alert.show("系统错误");
+				}
+				PopUpManager.removePopUp(loading);
+				
+			}  
+			protected function service_faultHandler(event:FaultEvent):void
+			{
+				Alert.show("Web连接出错!");
+				PopUpManager.removePopUp(loading);
+			}
+			
+			
+			public function addDataLine(){
+				initData.addItem({value:'',label:''});
+				dataGrid.selectedIndex = initData.length-1;
+			}
+			
+			protected function addImg_clickHandler(event:MouseEvent):void
+			{
+				addDataLine();
+			}
+			
+			
+			protected function minusImg_clickHandler(event:MouseEvent):void
+			{
+				if(dataGrid.selectedItem==null){
+					Alert.show("请选择数据!");
+					return;
+				}
+				for(var i:int=0;i<dataGrid.selectedIndices.length;i++){
+					var index:int = dataGrid.selectedIndices[i];
+					initData.removeItemAt(index);
+					i--;
+				}
+			}
+			
+			
+			public function setInitData(vlFlag:Number,value:String){
+				if(vlFlag==0){
+					initData.getItemAt(dataGrid.selectedIndex).field = value;
+				}else if(vlFlag==1){
+					
+					initData.getItemAt(dataGrid.selectedIndex).value = value;
+				}else if(vlFlag==3){
+					
+					initData.getItemAt(dataGrid.selectedIndex).condition = value;
+				}
+			}
+			protected function dataBaseTable_focusInHandler(event:*):void
+			{
+				
+				if(checkDataBase()==false){
+					return;
+				}
+				if(focusDataSourceTable!=0){
+					return;
+				}
+				focusDataSourceTable++;
+				if(dataSourceFrom.selectedIndex==0){
+					
+					PopUpManager.addPopUp(loading, parentDocument.hdbox, true); 
+					PopUpManager.centerPopUp(loading); 
+					TableSend();
+					
+				}
+			}
+			protected function dataBaseView_focusInHandler(event:*):void
+			{
+				if(checkDataBase()==false){
+					return;
+				}
+				
+				if(focusDataSourceView!=0){
+					return;
+				}
+				focusDataSourceView++;
+				if(dataSourceFrom.selectedIndex==1){
+					
+					PopUpManager.addPopUp(loading, parentDocument.hdbox, true); 
+					PopUpManager.centerPopUp(loading); 
+					ViewSend();
+				}
+			}
+
+
+			protected function dataBase_changeHandler(event:IndexChangeEvent):void
+			{
+				focusDataSourceTable=0;
+				focusDataSourceView=0;
+				if(currentState=="tableState"){
+					dataBaseTable.selectedIndex=-1;
+					dataBaseTable.textInput.text="";
+				}
+				if(currentState=="viewState"){
+					dataBaseView.selectedIndex=-1;
+					dataBaseView.textInput.text="";
+				}
+			}
+			/**
+			 * 验证数据库
+			 * */
+			private function checkDataBase():Boolean{
+				
+				var selectedIndex:Number=-1;
+				for(var i:int=0;i<dataBase.dataProvider.length;i++){
+					if(dataBase.textInput.text==dataBase.dataProvider[i].label){
+						selectedIndex=i;
+						break;
+					}
+				}
+				dataBase.selectedIndex = selectedIndex;
+				if(dataBase.selectedIndex==-1){
+					Alert.show("请选择数据库！");
+					return false;
+				}
+				return true;
+			}
+
+			protected function button1_clickHandler(event:MouseEvent):void
+			{
+				//Alert.show(parentDocument.SQLTmp.text);
+				var valueTmp:String;
+				if(dataSourceName.text==""){
+					Alert.show("请输入名称！");
+					return;
+				}
+				if(this.checkDataBase()==false){
+					return;
+				}				
+				if(currentState == "tableState"){
+					try{
+						valueTmp =  dataBaseTable.selectedItem.data;
+						
+					}catch(e:ReferenceError){
+					}catch(e:TypeError){
+						valueTmp = dataBaseTable.textInput.text;
+					}
+					if(valueTmp==""){
+						Alert.show("请从下拉中选择表！");
+						return;
+					}
+				}				
+				else if(currentState == "viewState"){
+					try{
+						valueTmp =  dataBaseView.selectedItem.data;
+					}catch(e:ReferenceError){
+					}catch(e:TypeError){
+						valueTmp = dataBaseView.textInput.text;
+					}
+					if(valueTmp==""){
+						Alert.show("请从下拉中选择视图！");
+						return;
+					}
+				}				
+				else if(currentState == "sqlState"){
+					if(sql==""){
+						Alert.show("请输入自定义SQL！");
+						return;
+					}else{
+						valueTmp =  sql;//parentDocument.SQLTmp.text;
+					}
+				}
+				if(!this.checkExist(dataSourceName.text)){
+					return;
+				}
+				var obj:Object=new Object();
+				obj["name"] = dataSourceName.text;
+				obj["database"] = dataBase.selectedItem.data;
+				obj["databaseName"] = dataBase.selectedItem.label;
+				obj["state"] = currentState;
+				obj["sqlvalue"] = valueTmp;
+				if(main.selected){
+					obj["main"] = "1";
+				}
+				/*var params:String = ""; 
+				for(var i:int=0;i<initData.length;i++){
+					if(i!=0){
+						params+=",";
+					}
+					params+="{\"value\":\""+initData[i].value+"\",\"label\":\""+initData[i].label+"\"}";
+				}	*/
+				obj["params"] =initData;			
+				
+				if(editIndex!=-1){
+					dataSourceManager.dataSourceArr[editIndex] =obj;
+				}else{
+					
+					dataSourceManager.dataSourceArr[dataSourceManager.dataSourceArr.length] =obj;
+				}
+				dataSourceManager.getDataSource();
+				
+				this.titleWindow_close();
+			}
+			//验证是否已经存在表
+			private function checkExist(name:String):Boolean{
+				for(var i:int=0;i<dataSourceManager.dataSourceArr.length;i++){
+					if(name==dataSourceManager.dataSourceArr[i]["name"] && i!=editIndex){
+						Alert.show("已经存在相同数据源名称，请修改！");
+						return false
+					}
+					if(currentState == "tableState" && main.selected==true && dataSourceManager.dataSourceArr[i]["main"]=="1"  && i!=editIndex){
+						Alert.show("已经存在主表，请修改！");
+						return false
+					}
+				}
+				return true;
+			
+			}
+			protected function button2_clickHandler(event:MouseEvent):void
+			{
+				this.titleWindow_close();
+					
+			}
+
+
+			protected function dataBaseTable_changeHandler(event:IndexChangeEvent):void
+			{
+					try{
+						dataSourceName.text = dataBaseTable.selectedItem.data;
+					}catch(e:ReferenceError){
+					}
+			}
+
+
+			protected function dataBaseView_changeHandler(event:IndexChangeEvent):void
+			{
+				
+					try{
+						dataSourceName.text = dataBaseView.selectedItem.data;
+					}catch(e:ReferenceError){
+					}
+			}
+			public function initModify(obj:Object,editIndex):void{
+				
+				
+				//Alert.show(obj["name"]);
+				dataSourceName.text = obj["name"];
+				//dataBase.selectedItem= {label:"test1",data:obj["database"]};
+				for(var i:int=0;i<dataBaseArr.length;i++){
+					if(obj["database"]==dataBaseArr[i].data){
+						dataBase.selectedIndex = i;
+					}
+				}
+				currentState = obj["state"];
+				if(obj["state"]=="tableState"){
+					dataBaseTable.textInput.text = obj["sqlvalue"];
+					if(obj["main"]=="1"){
+						main.selected=true;
+					}
+				}else if(obj["state"]=="viewState"){
+					dataBaseView.textInput.text = obj["sqlvalue"];
+				}else if(obj["state"]=="sqlState"){
+					sql = obj["sqlvalue"];
+				}
+				initData = obj["params"];	
+				dataGrid.dataProvider = initData;
+				this.editIndex = editIndex;
+			}
+			//自动显示行号中得到行号
+			private function getLineNum(item:Object,num:int):String{
+				var index:Number = initData.getItemIndex(item)+1;
+				return String(index);
+			}
+
+		]]>
+	</fx:Script>
+	<s:states>
+		<s:State name="viewState"/>
+		<s:State name="sqlState"/>
+		<s:State name="tableState"/>
+	</s:states>
+	<s:TitleWindow x="0" y="0" width="100%" height="100%" title="添加数据源" id ="titleWindow" width.tableState="430" height.tableState="374" width.viewState="430" height.viewState="374" width.sqlState="430" height.sqlState="374">
+		<s:Label x="39" y="43" text="数据库:" x.tableState="11" y.tableState="43"  x.viewState="11" y.viewState="43"  x.sqlState="11" y.sqlState="43"/>
+		<s:Label x="39" y="77" text="数据来源:" x.tableState="11" y.tableState="77"  x.viewState="11" y.viewState="77"  x.sqlState="11" y.sqlState="77"/>
+		<s:Label x="39" y="12" text="名称:" x.tableState="11" y.tableState="12"  x.viewState="11" y.viewState="12"  x.sqlState="11" y.sqlState="12"/>
+		<s:TextInput id="dataSourceName" x="96" y="2" width="157" maxChars="20" x.tableState="68" y.tableState="2"  x.viewState="68" y.viewState="2"  x.sqlState="68" y.sqlState="2"/>
+		<s:ComboBox id="dataBase" x="96" y="32" width="81" dataProvider="{dataBaseArr}" change="dataBase_changeHandler(event)" x.tableState="68" y.tableState="32"  x.viewState="68" y.viewState="32"  x.sqlState="68" y.sqlState="32"/>
+		<s:ComboBox  id="dataSourceFrom" x="96" y="66" width="81" dataProvider="{dataSource}" change="combobox1_changeHandler(event)" x.tableState="68" y.tableState="66"  x.viewState="68" y.viewState="66"  x.sqlState="68" y.sqlState="66"/>
+		<s:Button id="sqlBtn"  x="178" y="67" label="..." width="33" click="sqlBtn_clickHandler(event)" includeIn="sqlState"/>
+		<s:Label x="10" y="104" text="表:" includeIn="tableState" />
+		<s:ComboBox id="dataBaseTable" x="68" y="96" width="163"  includeIn="tableState" change="dataBaseTable_changeHandler(event)" click="dataBaseTable_focusInHandler(event)" focusIn="dataBaseTable_focusInHandler(event)"/>
+		<s:Label x="11" y="104" text="视图:" includeIn="viewState"/>
+		<s:ComboBox id="dataBaseView" x="69" y="96" width="163"  includeIn="viewState" change="dataBaseView_changeHandler(event)" click="dataBaseView_focusInHandler(event)" focusIn="dataBaseView_focusInHandler(event)"/>
+		<s:Button x="63" y="123" label="确定" click="button1_clickHandler(event)" x.tableState="256" y.tableState="311"  x.viewState="256" y.viewState="311"  x.sqlState="256" y.sqlState="311"/>
+		<s:Button x="159" y="123" label="取消" click="button2_clickHandler(event)" x.tableState="339" y.tableState="311"  x.viewState="339" y.viewState="311"  x.sqlState="339" y.sqlState="311"/>
+		<s:CheckBox includeIn="tableState" x="157" y="70" id="main" label="主表"/>
+		<mx:DataGrid id="dataGrid" x="10" y="124" height="98" width="257"  editable="true" allowMultipleSelection="true" width.tableState="399" height.tableState="107" y.tableState="127" x.tableState="10" width.viewState="399" height.viewState="107" y.viewState="127" x.viewState="10" width.sqlState="399" height.sqlState="107" y.sqlState="127" x.sqlState="10">
+			<mx:columns>
+				<mx:DataGridColumn headerText="序号" editable="false" width="40" labelFunction="getLineNum" >
+				</mx:DataGridColumn>
+				<mx:DataGridColumn headerText="表字段" dataField="field" >
+					<mx:itemEditor>
+						<fx:Component>
+							<mx:HBox>
+								<fx:Script>
+									<![CDATA[
+										import spark.events.TextOperationEvent;
+										public function get text():Object{
+											
+											return textInputWidth.text;
+										}
+										override public function set data(value:Object):void{
+											textInputWidth.text = value.field;
+											textInputWidth.setFocus();
+										}
+										
+										
+										protected function textInputWidth_changeHandler(event:TextOperationEvent):void
+										{
+											outerDocument.setInitData(0,textInputWidth.text);
+										}
+										
+										
+										protected function textInputWidth_focusInHandler(event:FocusEvent):void
+										{
+											
+											IME.enabled=true;
+										}
+										
+									]]>
+									
+								</fx:Script>
+								<s:TextInput width="100%" id="textInputWidth" change="textInputWidth_changeHandler(event)" restrict="[a-zA-Z][a-zA-Z_0-9]*$" focusIn="textInputWidth_focusInHandler(event)" />
+							</mx:HBox>
+						</fx:Component>
+					</mx:itemEditor>
+				</mx:DataGridColumn>
+				
+				<mx:DataGridColumn headerText="条件" dataField="condition" width="60">
+					<mx:itemEditor>
+						<fx:Component>
+							<mx:HBox>
+								<fx:Script>
+									<![CDATA[
+										import mx.controls.Alert;
+										import mx.events.ListEvent;
+										
+										import spark.events.TextOperationEvent;
+										public function get text():Object{
+											
+											return comboBox.selectedItem.label;
+										}
+										override public function set data(value:Object):void{			
+											for(var i=0;i<outerDocument.conditionData.length;i++){
+												if(value.condition==outerDocument.conditionData[i].label){
+													comboBox.selectedItem=outerDocument.conditionData[i];
+													comboBox.selectedIndex = i;
+												}
+											}
+										}
+																			
+										
+
+										protected function comboBox_changeHandler(event:ListEvent):void
+										{
+											outerDocument.setInitData(3,comboBox.selectedItem.data);
+										}
+
+									]]>
+									
+								</fx:Script>
+								<mx:ComboBox id="comboBox" width="100%"  change="comboBox_changeHandler(event)" dataProvider="{outerDocument.conditionData}" />
+								<!--<s:TextInput width="100%" id="textInputWidth" change="textInputWidth_changeHandler(event)" focusIn="textInputWidth_focusInHandler(event)" />-->
+							</mx:HBox>
+						</fx:Component>
+					</mx:itemEditor>
+				</mx:DataGridColumn>
+				<mx:DataGridColumn headerText="外部参数" dataField="value" >
+					<mx:itemEditor>
+						<fx:Component>
+							<mx:HBox>
+								<fx:Script>
+									<![CDATA[
+										import spark.events.TextOperationEvent;
+										public function get text():Object{
+											
+											return textInputWidth.text;
+										}
+										override public function set data(value:Object):void{
+											textInputWidth.text = value.value;
+											textInputWidth.setFocus();
+										}
+										
+										
+										protected function textInputWidth_changeHandler(event:TextOperationEvent):void
+										{
+											outerDocument.setInitData(1,textInputWidth.text);
+										}
+										
+										
+										protected function textInputWidth_focusInHandler(event:FocusEvent):void
+										{
+											
+											IME.enabled=true;
+										}
+										
+									]]>
+									
+								</fx:Script>
+								<s:TextInput width="100%" id="textInputWidth" change="textInputWidth_changeHandler(event)"  restrict="[a-zA-Z][a-zA-Z_0-9][\{a-zA-Z\}][\{a-zA-Z_0-9\}]*$"  focusIn="textInputWidth_focusInHandler(event)" />
+							</mx:HBox>
+						</fx:Component>
+					</mx:itemEditor>
+				</mx:DataGridColumn>
+				
+			</mx:columns>
+			<mx:dataProvider>
+				{initData}
+			</mx:dataProvider>
+		</mx:DataGrid>
+		<mx:Image x="450" y="35" source="../asserts/add.png" id="addImg" click="addImg_clickHandler(event)" useHandCursor="true" buttonMode="true" x.tableState="338" y.tableState="128"  x.viewState="338" y.viewState="128"  x.sqlState="338" y.sqlState="128"/>
+		<mx:Image x="450" y="57" source="../asserts/minus.png" id="minusImg" click="minusImg_clickHandler(event)" useHandCursor="true" buttonMode="true" x.tableState="363" y.tableState="128"  x.viewState="363" y.viewState="128"  x.sqlState="363" y.sqlState="128"/>
+		<mx:TextArea x="11" y="239"  height="35" width="407" editable="false" text="提示：1、外部参数  如设定为${keycode\}时，将会从request中取得keycode的动态参数；如不包含${}则为静态值。&#xd;2、sysLoginUserid:登录用户" height.tableState="64" width.tableState="398" height.viewState="64" width.viewState="398" height.sqlState="64" width.sqlState="398">
+			
+		</mx:TextArea>
+		
+	</s:TitleWindow>
+</s:Group>

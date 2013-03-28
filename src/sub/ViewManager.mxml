@@ -1,0 +1,480 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx"  >
+	<s:layout>
+		<s:BasicLayout/>
+	</s:layout>
+	<fx:Script>
+		<![CDATA[
+			import components.InputField;
+			import components.InputLabel;
+			import components.STButton;
+			import components.STCheckBox;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.XMLListCollection;
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.events.DataGridEvent;
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			
+			import spark.events.IndexChangeEvent;
+			
+			import tags.Table;
+			import tags.Td;
+			import tags.Tr;
+			private var loading:Loading = new Loading();
+			public var formDesign:FormDesign;
+			private var fieldXMLList:XMLListCollection;
+			public var alignData: ArrayCollection = new ArrayCollection(  
+				[  
+					{label:"left"},    
+					{label:"center"} ,
+					{label:"right"}]);
+			private var filedDataGridData:ArrayCollection = new ArrayCollection();
+			public function initData():void{
+				dataSource.dataProvider = formDesign.getDataSourceByArrayCollection();
+				dataSource.labelField = "label";
+				//dataSource.selectedIndex=-1;
+				
+			}
+
+			protected function dataSource_changeHandler(event:IndexChangeEvent):void
+			{
+				
+				if(dataSource.selectedItem!=null){
+					try{
+						fieldXMLList =   new XMLListCollection(new XMLList(formDesign.getFieldByXMLList(dataSource.selectedItem.data)+""));
+						fieldList.dataProvider =fieldXMLList;
+						fieldList.labelField="@name";
+						//filedDataGridData = new ArrayCollection();
+						//filedDataGrid.dataProvider = filedDataGridData;
+						//filedDataGrid.invalidateList();
+					}catch(e:*){
+					}
+				}	
+			}
+
+			protected function leftMove_clickHandler(event:MouseEvent):void
+			{
+				if(fieldList.selectedItems!=null && fieldList.selectedItems.length>0){
+					for(var i:int=0;i<fieldList.selectedItems.length;i++){
+						var selectedItem:Object =fieldList.selectedItems[i];
+						filedDataGridData.addItem({row:filedDataGridData.length+1,field:selectedItem.@name,fieldName:"",width:"",align:"",custom:""});
+					}
+					
+					for(var i:int=0;i<fieldList.selectedItems.length;i++){
+						var selectedItem:Object =fieldList.selectedItems[i];
+						for(var n:int=0;n<fieldList.dataProvider.length;n++){
+							if(fieldList.dataProvider[n]==selectedItem){
+								fieldList.dataProvider.removeItemAt(n);
+								i--;
+								break;
+							}
+						}
+					}
+					filedDataGrid.dataProvider = filedDataGridData;
+				}
+			}
+
+
+			protected function leftMoveAll_clickHandler(event:MouseEvent):void
+			{
+				if(fieldList.dataProvider!=null && fieldList.dataProvider.length>0){
+					for(var n:int=0;n<fieldList.dataProvider.length;n++){
+						var selectedItem:Object =fieldList.dataProvider[n];
+						filedDataGridData.addItem({row:filedDataGridData.length+1,field:selectedItem.@name,fieldName:"",width:"",align:"",custom:""});
+						fieldList.dataProvider.removeItemAt(n);
+						n--;
+					}
+					filedDataGrid.dataProvider = filedDataGridData;
+				}
+			}
+
+
+			protected function rightMove_clickHandler(event:MouseEvent):void
+			{
+				//if(fieldXMLList==null){
+					//fieldXMLList = new XMLListCollection();
+					//fieldXMLList =  new XMLListCollection(formDesign.getFieldByXMLList(dataSource.selectedItem.data).copy());
+					//fieldList.dataProvider = fieldXMLList;
+					//Alert.show(fieldXMLList+"")
+				//}
+				if(filedDataGrid.selectedItems!=null && filedDataGrid.selectedItems.length>0){
+					for(var i:int=0;i<filedDataGrid.selectedItems.length;i++){
+						var selectedItem:Object =filedDataGrid.selectedItems[i];
+						var xml:XML = XML("<field name='"+selectedItem.field+"'/>");
+						//Alert.show(fieldXMLList+"");
+						if(fieldList.dataProvider==null){
+							fieldList.dataProvider = new XMLListCollection(new XMLList(formDesign.getFieldByXMLList(dataSource.selectedItem.data)+""));
+						}
+						fieldList.dataProvider.addItem(xml);
+					}
+					for(var i:int=0;i<filedDataGrid.selectedItems.length;i++){
+						var selectedItem:Object =filedDataGrid.selectedItems[i];
+						for(var n:int=0;n<filedDataGrid.dataProvider.length;n++){
+							if(filedDataGrid.dataProvider[n]==selectedItem){
+								filedDataGrid.dataProvider.removeItemAt(n);
+								i--;
+								break;
+							}
+						}
+					}
+				}
+				
+				this.setFiledDataGridRow();
+			}
+
+
+			protected function rightMoveAll_clickHandler(event:MouseEvent):void
+			{
+				
+				if(filedDataGrid.dataProvider!=null && filedDataGrid.dataProvider.length>0){
+					for(var n:int=0;n<filedDataGrid.dataProvider.length;n++){
+						var selectedItem:Object =filedDataGrid.dataProvider[n];
+						var xml:XML = XML("<field name='"+selectedItem.field+"'/>");
+						
+						if(fieldList.dataProvider==null){
+							fieldList.dataProvider = new XMLListCollection(new XMLList(formDesign.getFieldByXMLList(dataSource.selectedItem.data)+""));
+						}
+						fieldList.dataProvider.addItem(xml);
+						filedDataGrid.dataProvider.removeItemAt(n);
+						n--;
+					}
+				}
+				this.setFiledDataGridRow();
+			}
+			public function setFiledDataGridRow():void{
+				if(filedDataGrid.dataProvider!=null && filedDataGrid.dataProvider.length>0){
+					for(var n:int=0;n<filedDataGrid.dataProvider.length;n++){
+						filedDataGrid.dataProvider[n].row = n+1;
+					}
+				}
+				
+			}
+			
+			protected function upMoveBtn_clickHandler(event:MouseEvent):void
+			{
+				if(filedDataGrid.selectedIndex==0){
+					return;
+				}
+				var selectedIndex:Number = filedDataGrid.selectedIndex;
+				var selectedItem:Object = filedDataGrid.selectedItem;
+				var vsp:Number = filedDataGrid.verticalScrollPosition;
+				var dataArrTmp:ArrayCollection = new ArrayCollection();
+				for(var i:int=0;i<filedDataGridData.length;i++){
+					if(i+1==filedDataGrid.selectedIndex){
+						dataArrTmp.addItem(filedDataGridData[i+1]);
+					}else if(i==filedDataGrid.selectedIndex){
+						dataArrTmp.addItem(filedDataGridData[i-1]);
+					}else{
+						dataArrTmp.addItem(filedDataGridData[i]);
+					}
+				}
+				filedDataGridData  = dataArrTmp;
+				//this.loadData();
+				filedDataGrid.dataProvider = filedDataGridData;
+				filedDataGrid.selectedItem=selectedItem;
+				filedDataGrid.verticalScrollPosition  = vsp;
+				this.setFiledDataGridRow();
+			}
+			
+			
+			protected function downMoveBtn_clickHandler(event:MouseEvent):void
+			{
+				
+				if(filedDataGrid.selectedItem==null 
+					|| filedDataGrid.selectedIndex==filedDataGridData.length-1){
+					return;
+				}
+				var selectedIndex:Number = filedDataGrid.selectedIndex;
+				var selectedItem:Object = filedDataGrid.selectedItem;
+				var vsp:Number = filedDataGrid.verticalScrollPosition;
+				var dataArrTmp:ArrayCollection = new ArrayCollection();
+				for(var i:int=0;i<filedDataGridData.length;i++){
+					if(i-1==filedDataGrid.selectedIndex){
+						dataArrTmp.addItem(filedDataGridData[i-1]);
+					}else if(i==filedDataGrid.selectedIndex){
+						dataArrTmp.addItem(filedDataGridData[i+1]);
+					}else{
+						dataArrTmp.addItem(filedDataGridData[i]);
+					}
+				}
+				filedDataGridData  = dataArrTmp;
+				//this.loadData();
+				filedDataGrid.dataProvider = filedDataGridData;
+				filedDataGrid.selectedItem=selectedItem;
+				filedDataGrid.verticalScrollPosition  = vsp;
+				this.setFiledDataGridRow();
+			}
+			public function checkRowid():Boolean{
+				var exist:Boolean;
+				if(dataSource.selectedItem!=null && dataSource.selectedItem.state!='tableState'){//state					
+					/*if(dataSource.dataProvider!=null && dataSource.dataProvider.length>0){
+						for(var n:int=0;n<dataSource.dataProvider.length;n++){
+							var obj:Object = dataSource.dataProvider[n];
+							if(obj.field.toLocaleLowerCase()=='rowid'){
+								exist=true;
+								break;
+							}
+						}
+					}*/
+					
+					fieldXMLList =  new XMLListCollection(new XMLList(formDesign.getFieldByXMLList(dataSource.selectedItem.data)+""))
+					for(var i:int=0;i<fieldXMLList.length;i++){
+						var obj:Object = fieldXMLList.getItemAt(i);
+						if(obj.@name.toLocaleLowerCase()=='rowid'){
+							exist=true;
+							break;
+						}
+					}
+				}else{
+					exist=true;
+				}
+				return exist;
+			}
+
+			protected function okBtn_clickHandler(event:MouseEvent):void
+			{
+				if(this.checkRowid()==false){
+					Alert.show("显示列表的数据源下找不到ROWID!","提示")
+				}
+			}
+			public function getXMLStr():String{
+				this.setDataSourceText();
+				if(this.checkRowid()==false){
+					Alert.show("显示列表的数据源下找不到ROWID!","提示")
+					//return "";
+				}
+				if(dataSource.selectedIndex ==-1){
+					return "";
+				}
+				dataSource.selectedItem = dataSource.dataProvider[dataSource.selectedIndex];
+				var xmlStr:String  = "<viewField source='"+dataSource.selectedItem.data+"'  >\n";
+				if(filedDataGrid.dataProvider.length>0){
+					for(var i:int=0;i<filedDataGrid.dataProvider.length;i++){
+						var obj:Object = filedDataGrid.dataProvider[i];
+						xmlStr+="	<field field='"+obj.field+"' fieldName='"+obj.fieldName+"' width='"+obj.width+"'  align='"+obj.align+"'>\n"
+						//Alert.show(obj.text())
+						if(obj.custom!=""){
+							xmlStr+="		START_CDATA";
+							xmlStr+=obj.custom;
+							xmlStr+="		END_CDATA"
+						}
+						xmlStr+="	</field>\n";
+					}
+				}else if(fieldList.dataProvider.length>0){
+					for(var i:int=0;i<fieldList.dataProvider.length;i++){
+						var obj:Object = fieldList.dataProvider[i];
+						xmlStr+="	<field field='"+obj.@name+"' fieldName='' width=''  align=''>\n";
+						xmlStr+="	</field>\n";
+					}
+				}
+				xmlStr += "</viewField>\n";
+				
+				//xmlStr = xmlStr.replace("START_CDATA", "<!\[CDATA\[").replace("END_CDATA", "\]\]>");
+				return xmlStr;
+			}
+			public function xml2list(xml:XML ):void{
+				if(xml!=null){
+					initData();//初始化数据
+					this.setDataSourceText(xml.@source);
+					filedDataGridData.removeAll();
+					var children:XMLList = xml.children();
+					for(var i:int=0;i<children.length();i++){
+						var childrenXml:XML = children[i];
+						var custom:String =  childrenXml.text();
+						custom= custom.replace("START_CDATA","");
+						custom= custom.replace("END_CDATA","");
+						filedDataGridData.addItem({row:filedDataGridData.length+1,field:childrenXml.@field,fieldName:childrenXml.@fieldName,width:childrenXml.@width,align:childrenXml.@align,custom:custom});
+						
+					}
+				}
+				
+			}
+			//删除已经在列表存在的LIST值
+			public function removeListExist():void{
+				this.setDataSourceText();
+				if(dataSource.selectedIndex!=-1){
+					fieldXMLList =   new XMLListCollection(new XMLList(formDesign.getFieldByXMLList(dataSource.selectedItem.data)+""));
+					fieldList.dataProvider =fieldXMLList;
+					fieldList.labelField="@name";
+				}
+				for(var i:int=0;i<filedDataGrid.dataProvider.length;i++){
+					var obj:Object = filedDataGrid.dataProvider[i];
+					for(var n:int=0;n<fieldList.dataProvider.length;n++){
+						var objList:Object = fieldList.dataProvider[n];
+						if(objList.@name==obj.field){
+							fieldList.dataProvider.removeItemAt(n);
+							break;
+						}
+					}
+				}
+			}
+			public function addLoading():void{
+				
+				PopUpManager.addPopUp(loading,parentDocument.hdbox, true);
+				PopUpManager.centerPopUp(loading); 
+			}
+			public function removeLoading():void{
+				
+				PopUpManager.removePopUp(loading);
+			}
+			public function setDataSourceText(text:String=null):void{
+				if(text==null || ""==text){
+					text = dataSource.textInput.text;
+				}
+				for(var i:int=0;i<dataSource.dataProvider.length;i++){
+					var obj:Object = dataSource.dataProvider[i];
+					if(obj.data==text ){
+						dataSource.selectedItem = obj;
+						dataSource.selectedIndex = i;
+						break;
+					}
+				}
+			}
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<s:Label x="10" y="19" text="数据源："/>
+	<s:ComboBox x="66" y="10" id="dataSource" change="dataSource_changeHandler(event)"/>
+	
+	<s:List x="10" y="42" height="85%" width="103" id="fieldList" allowMultipleSelection="true"></s:List>
+	<mx:DataGrid x="165" y="41" width="80%" height="85%" 
+				 editable="true"  allowMultipleSelection="true" sortableColumns="false" 
+				 id="filedDataGrid"   >
+		<mx:columns>
+			<mx:DataGridColumn headerText="序号" 	dataField="row" width="40" editable="false" />
+			<mx:DataGridColumn headerText="字段名" 	dataField="field" width="100" editable="false" />
+			<mx:DataGridColumn headerText="显示名" 	dataField="fieldName"  width="110"  >
+				<mx:itemEditor>
+					<fx:Component>
+						<mx:HBox>
+							<fx:Script>
+								<![CDATA[
+									public function get text():Object{
+										
+										return textInputFieldName.text;
+									}
+									override public function set data(value:Object):void{
+										textInputFieldName.text = value.fieldName;
+										textInputFieldName.setFocus();
+									}
+
+									protected function textInputFieldName_focusInHandler(event:FocusEvent):void
+									{
+										IME.enabled=true;
+									}
+
+								]]>
+								
+							</fx:Script>
+							<s:TextInput width="100%" id="textInputFieldName" focusIn="textInputFieldName_focusInHandler(event)"  maxChars="20"/>
+						</mx:HBox>
+					</fx:Component>
+				</mx:itemEditor>
+			</mx:DataGridColumn>
+			<mx:DataGridColumn headerText="列宽" 	dataField="width" width="50"  >
+				<mx:itemEditor>
+					<fx:Component>
+						<mx:HBox>
+							<fx:Script>
+								<![CDATA[
+									public function get text():Object{
+										
+										return textInputWidth.text;
+									}
+									override public function set data(value:Object):void{
+										textInputWidth.text = value.width;
+										textInputWidth.setFocus();
+									}
+								]]>
+								
+							</fx:Script>
+							<s:TextInput width="100%" id="textInputWidth"  restrict="0-9/^" maxChars="3"/>
+						</mx:HBox>
+					</fx:Component>
+				</mx:itemEditor>
+			</mx:DataGridColumn>
+			<mx:DataGridColumn headerText="对齐方式" dataField="align" width="90" >
+				<mx:itemEditor>
+					<fx:Component>
+						<mx:HBox>
+							<fx:Script>
+								<![CDATA[
+									public function get text():Object{
+										if(comboBox.selectedItem!=null){
+											return comboBox.selectedItem.label;
+										}
+										return null;
+									}
+									override public function set data(value:Object):void{
+										comboBox.selectedIndex=-1;
+										for each(var iterm:Object in comboBox.dataProvider){
+											if(iterm.label == value.align){
+												comboBox.selectedItem = iterm;
+											}
+										}
+									}										
+								]]>
+							</fx:Script>
+							<mx:ComboBox id="comboBox" width="100%" dataProvider="{outerDocument.alignData}"/>
+						</mx:HBox>
+					</fx:Component>
+				</mx:itemEditor>
+			</mx:DataGridColumn>
+			<mx:DataGridColumn headerText="自定义显示" dataField="custom" width="90" >
+				<mx:itemEditor>
+					<fx:Component>
+						<mx:HBox>
+							<fx:Script>
+								<![CDATA[
+									import mx.managers.PopUpManager;
+									private var t_Obj:Object;
+									public function get text():Object{
+										
+										return textCustomInputWidth.text;
+									}
+									override public function set data(value:Object):void{
+										textCustomInputWidth.text = value.custom;
+										textCustomInputWidth.setFocus();
+										this.t_Obj = value;
+									}
+									
+									protected function subBtn_clickHandler(event:MouseEvent):void
+									{
+											var dsa:CustomView = new CustomView();
+											dsa.viewManager = outerDocument;
+											t_Obj.custom = textCustomInputWidth.text;
+											dsa.t_Obj = t_Obj;
+											PopUpManager.addPopUp(dsa, outerDocument, true); 
+											PopUpManager.centerPopUp(dsa); 
+									}
+
+								]]>
+								
+							</fx:Script>
+							<s:TextInput width="100%" id="textCustomInputWidth"  />
+							<s:Button id="subBtn" label="..." right="0"  width="30" click="subBtn_clickHandler(event)"/>
+						</mx:HBox>
+					</fx:Component>
+				</mx:itemEditor>
+			</mx:DataGridColumn>
+		</mx:columns>
+		<mx:dataProvider>
+			{filedDataGridData}
+		</mx:dataProvider>
+	</mx:DataGrid>
+	
+	<s:Button x="119" y="116" label="&gt;" width="41" id="leftMove" click="leftMove_clickHandler(event)"/>
+	<s:Button x="119" y="139" label="&gt;&gt;" width="41" id="leftMoveAll" click="leftMoveAll_clickHandler(event)"/>
+	<s:Button x="119" y="177" label="&lt;" width="41" id="rightMove" click="rightMove_clickHandler(event)"/>
+	<s:Button x="119" y="200" label="&lt;&lt;" width="41" id="rightMoveAll" click="rightMoveAll_clickHandler(event)"/>
+	<s:Button x="169" bottom="20" label="上移" width="47" id="upMoveBtn"   click="upMoveBtn_clickHandler(event)"/>
+	<s:Button x="219" bottom="20" label="下移" width="47" id="downMoveBtn"  click="downMoveBtn_clickHandler(event)"/>
+	<!--<s:Button right="50" bottom="20" label="确定" width="47" id="okBtn"  click="okBtn_clickHandler(event)" />-->
+</s:Group>

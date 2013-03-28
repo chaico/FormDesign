@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx"  width="500" height="400" creationComplete="init()">
+	<s:layout>
+		<s:BasicLayout/>
+	</s:layout>
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+		<mx:HTTPService id="service" resultFormat="text"  fault="service_faultHandler(event)"
+					   url="http://localhost:8080/HSecurity/SQLField"   
+					   result="onJSONLoad(event)" />
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.serialization.json.JSON;
+			import com.adobe.serialization.json.JSONDecoder;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			import spark.events.IndexChangeEvent;
+			
+			import sys.Config;
+			private var loading:Loading = new Loading();
+			private var webURL:String;
+			private var config:Config = new Config();
+			private var OKFlag:Boolean;
+			public var dataBase:String;
+			public var dataSourceAdd:DataSourceAdd;
+			private function init():void{
+				titleWindow.addEventListener(CloseEvent.CLOSE, titleWindow_close);
+				titleWindow.isPopUp = true;
+				
+			}
+			//关闭弹出对话框
+			private function titleWindow_close(event:CloseEvent=null):void { 
+				PopUpManager.removePopUp(this); 
+			} 
+			private function onJSONLoad(event:ResultEvent):void  
+			{   
+				
+				try{
+					var rawData:String = String(event.result);  
+					var json :JSONDecoder = new JSONDecoder(rawData);
+					if(json.getObject().success==0){
+						Alert.show(json.getObject().errorMSG);
+					}else{
+						if(OKFlag==false){
+							Alert.show("测试通过！");
+						}else{
+							this.titleWindow_close();
+						}
+					}
+				}catch(e:*){
+					Alert.show("系统错误");
+				}
+				this.removeLoading();
+			}  
+
+
+
+			protected function button1_clickHandler(event:MouseEvent):Boolean
+			{	
+				if(sqlTextArea.text==""){
+					Alert.show("请输入SQL语句!");
+					return false;
+				}
+				this.addLoading();
+				service.url = config.webURL+"/SQLField";
+				var params:Object = new Object();
+				params["sql"]=sqlTextArea.text;
+				params["dataBase"]=dataBase;
+				params["time"] = new Date().date;
+				service.method="POST";
+				service.send(params);
+				return true;
+			}
+
+
+			protected function service_faultHandler(event:FaultEvent):void
+			{
+				Alert.show("Web连接出错!");
+				this.removeLoading();
+			}
+
+
+			protected function button2_clickHandler(event:MouseEvent):void
+			{
+				OKFlag=true;
+				if(this.button1_clickHandler(event)){
+					//Alert.show(parent);
+					dataSourceAdd.sql = sqlTextArea.text;
+					//parentDocument.SQLTmp.text = sqlTextArea.text;
+				}else{
+					OKFlag=false;
+				}
+			}
+			public function addLoading():void{
+				
+				PopUpManager.addPopUp(loading,parentDocument.hdbox, true);
+				PopUpManager.centerPopUp(loading); 
+			}
+			public function removeLoading():void{
+				
+				PopUpManager.removePopUp(loading);
+			}
+
+		]]>
+	</fx:Script>
+	<s:TitleWindow x="0" y="0" width="100%" height="100%" title="SQL" id ="titleWindow">
+		<s:TextArea id="sqlTextArea" x="0" y="0" width="100%" height="339"/>
+		<s:Button x="313" y="345" label="测试" click="button1_clickHandler(event)"/>
+		<s:Button x="408" y="345" label="确认" click="button2_clickHandler(event)"/>
+	
+	</s:TitleWindow>
+</s:Group>

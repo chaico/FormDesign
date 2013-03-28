@@ -1,0 +1,346 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="520" height="480" creationComplete="init()" xmlns:ui="flex.utils.ui.*">
+	<s:layout>
+		<s:BasicLayout/>
+	</s:layout>
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+		<mx:HTTPService id="service" resultFormat="text"  fault="service_faultHandler(event)"
+						url="http://localhost:8080/HSecurity/SQLField"   
+						result="onJSONLoad(event)" />
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.serialization.json.JSONDecoder;
+			import com.adobe.serialization.json.JSONToken;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.events.DataGridEvent;
+			import mx.events.FlexEvent;
+			import mx.managers.FocusManager;
+			import mx.managers.IFocusManager;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			import sys.Config;
+			public var t_Obj:Object;
+			private var OKFlag:Boolean;
+			public var formDesign:FormDesign;
+			private var loading:Loading = new Loading();
+			private var config:Config = new Config();
+			public var initData: ArrayCollection = new ArrayCollection();
+			private function init():void{
+				titleWindow.addEventListener(CloseEvent.CLOSE, titleWindow_close);
+				titleWindow.isPopUp = true;
+				addEventListener(FlexEvent.UPDATE_COMPLETE,function():void{
+					if(t_Obj.value!=null && t_Obj.value!=""){
+						try{				
+							
+							var jsonStr =t_Obj.value;//'{"db":{"database":"1","sql":"select * from sys_datalist;","value":"code","label":"name"},"custom":[{"value":"1","label":"2"},{"value":"3","label":"4"},{"value":"5","label":"6"}]}';
+							//var json:JSONToken = new JSONToken(jsonStr) ;
+							//Alert.show(json.value+"")
+							var json :JSONDecoder = new JSONDecoder(jsonStr);
+							for(var i:int=0;i<dataBase.dataProvider.length;i++){
+								if(dataBase.dataProvider[i].data==json.getObject().db.database){
+									dataBase.selectedItem = dataBase.dataProvider[i];
+									dataBase.selectedIndex = i;
+								}
+							}
+							sqlTextArea.text = json.getObject().db.sql;
+							valueTextInput.text = json.getObject().db.value;
+							labelTextInput.text = json.getObject().db.label;
+							for(var i:int=0;i<json.getObject().custom.length;i++){
+								var obj:Object = json.getObject().custom[i]
+								initData.addItem({label:obj.label,value:obj.value})
+							}
+							
+						}catch(e:*){
+							//throw e;
+						}
+					}
+					//t_value.text = t_Obj.value;
+				});
+				dataBase.invalidateSize();
+			}
+			//关闭弹出对话框
+			private function titleWindow_close(event:CloseEvent=null):void { 
+				PopUpManager.removePopUp(this); 
+			} 
+			
+			
+
+			protected function okBtn_clickHandler(event:MouseEvent):void
+			{
+				
+				var result:String = "";
+				result+="{";
+				result+="\"db\":{\"database\":\""+(dataBase.selectedItem!=null?dataBase.selectedItem.data:"")+"\",\"sql\":\""+sqlTextArea.text+"\",\"value\":\""+valueTextInput.text+"\",\"label\":\""+labelTextInput.text+"\"}";
+				result+=",\"custom\":[";
+				for(var i:int=0;i<initData.length;i++){
+					if(i!=0){
+						result+=",";
+					}
+					result+="{\"value\":\""+initData[i].value+"\",\"label\":\""+initData[i].label+"\"}";
+				}
+				result+="]";
+				result+="}";
+				//Alert.show(result);
+				formDesign.setPropertie(t_Obj.id,result)
+				formDesign.onGridEdit(t_Obj);
+				
+				formDesign.dgProp.invalidateList();
+				this.titleWindow_close(null);
+			}
+
+
+			protected function cancelBtn_clickHandler(event:MouseEvent):void
+			{
+				this.titleWindow_close(null);
+			}
+
+
+			public function setInitData(vlFlag:Number,value:String){
+				if(vlFlag==0){
+					initData.getItemAt(dataGrid.selectedIndex).value = value;
+				}else if(vlFlag==1){
+					
+					initData.getItemAt(dataGrid.selectedIndex).label = value;
+				}
+			}
+			private function onJSONLoad(event:ResultEvent):void  
+			{   
+				
+				try{
+					var rawData:String = String(event.result);  
+					var json :JSONDecoder = new JSONDecoder(rawData);
+					//Alert.show(rawData);
+					if(json.getObject().success==0){
+						Alert.show(json.getObject().errorMSG);
+					}else{
+						if(OKFlag==false){
+							var valueExists:Boolean=false;
+							var labelExists:Boolean=false;
+							if(json.getObject().fields!=null ){
+								for(var i:int=0;i<json.getObject().fields.length;i++){
+									if(json.getObject().fields[i].toLocaleLowerCase()==valueTextInput.text.toLocaleLowerCase()){
+										valueExists=true;
+									}
+									if(json.getObject().fields[i].toLocaleLowerCase()==labelTextInput.text.toLocaleLowerCase()){
+										labelExists=true;
+									}
+								}
+							}
+							var msg:String="";
+							if(!valueExists){
+								msg = "测试语句中找不到"+valueTextInput.text+"字段！\n";
+							}
+							if(!labelExists){
+								msg += "测试语句中找不到"+labelTextInput.text+"字段！";
+							}
+							if(msg!=""){
+								Alert.show(msg);
+							}else{								
+								Alert.show("测试通过！");
+							}
+						}else{
+							this.titleWindow_close();
+						}
+					}
+				}catch(e:*){
+					Alert.show("系统错误");
+				}
+				this.removeLoading();
+			}  
+			
+			
+			
+			protected function button1_clickHandler(event:MouseEvent):Boolean
+			{	
+				var msg:String="";
+				if(dataBase.selectedItem==null){
+					msg +="请选择数据库！\n";
+				}
+				if(valueTextInput.text==""){
+					msg +="请输入Value字段!\n";
+				}
+				if(labelTextInput.text==""){
+					msg +="请输入Label字段!\n";
+				}
+				if(sqlTextArea.text==""){
+					msg +="请输入SQL语句!\n";
+				}
+				if(msg!=""){
+					Alert.show(msg);
+					return false;
+				}
+				this.addLoading();
+				service.url = config.webURL+"/SQLField";
+				var params:Object = new Object();
+				params["sql"]=sqlTextArea.text;
+				params["dataBase"]=dataBase.selectedItem.data;
+				params["time"] = new Date().date;
+				service.method="POST";
+				service.send(params);
+				return true;
+			}
+			
+			
+			protected function service_faultHandler(event:FaultEvent):void
+			{
+				Alert.show("Web连接出错!");
+				this.removeLoading();
+			}
+			public function addLoading():void{
+				
+				PopUpManager.addPopUp(loading,parentDocument.hdbox, true);
+				PopUpManager.centerPopUp(loading); 
+			}
+			public function removeLoading():void{
+				
+				PopUpManager.removePopUp(loading);
+			}
+
+
+			
+			public function addDataLine(){
+				initData.addItem({value:'',label:''});
+				dataGrid.selectedIndex = initData.length-1;
+			}
+
+			protected function addImg_clickHandler(event:MouseEvent):void
+			{
+				addDataLine();
+			}
+
+
+			protected function minusImg_clickHandler(event:MouseEvent):void
+			{
+				if(dataGrid.selectedItem==null){
+					Alert.show("请选择数据!");
+					return;
+				}
+				for(var i:int=0;i<dataGrid.selectedIndices.length;i++){
+					var index:int = dataGrid.selectedIndices[i];
+					initData.removeItemAt(index);
+					i--;
+				}
+			}
+			//自动显示行号中得到行号
+			private function getLineNum(item:Object,num:int):String{
+				var index:Number = initData.getItemIndex(item)+1;
+				return String(index);
+			}
+
+		]]>
+	</fx:Script>
+	<s:TitleWindow x="0" y="0" width="100%" height="100%" title="选项值定义" id ="titleWindow">
+		<ui:TitledBorderBox title="数据库值" width="490" height="188" x="16" y="10" layout="absolute" cornerRadius="5" >
+			<s:Label x="13" y="32" text="数据库:"/>
+			<s:ComboBox id="dataBase" x="59" y="21" width="81" dataProvider="{formDesign.dataBaseArr}" />
+			<s:Label x="163" y="32" text="Value:"/>
+			<s:TextInput x="205" y="21" width="89"  id="valueTextInput" />
+			<s:Label x="308" y="31" text="Label:"/>
+			<s:TextInput x="350" y="20" width="89"  id="labelTextInput" />
+			<s:Label x="13" y="57" text="SQL:"/>
+			<s:TextArea x="59" y="52" height="87" width="410" tabIndex="4" id="sqlTextArea" />
+			<s:Button x="399" y="147" label=" 测试" click="button1_clickHandler(event)"/>
+		</ui:TitledBorderBox>
+		
+	<ui:TitledBorderBox title="自定义值" width="490" height="209" x="16" y="212" layout="absolute" cornerRadius="5" >
+		<mx:DataGrid x="13" y="15" width="467" height="165"  id="dataGrid" editable="true" allowMultipleSelection="true">
+			<mx:columns>
+				<mx:DataGridColumn headerText="序号" editable="false" width="40" labelFunction="getLineNum" >
+				</mx:DataGridColumn>
+				<mx:DataGridColumn headerText="Value" dataField="value" width="150">
+					
+					<mx:itemEditor>
+						<fx:Component>
+							<mx:HBox>
+								<fx:Script>
+									<![CDATA[
+										import spark.events.TextOperationEvent;
+										public function get text():Object{
+											
+											return textInputWidth.text;
+										}
+										override public function set data(value:Object):void{
+											textInputWidth.text = value.value;
+											textInputWidth.setFocus();
+										}
+
+
+										protected function textInputWidth_changeHandler(event:TextOperationEvent):void
+										{
+											outerDocument.setInitData(0,textInputWidth.text);
+										}
+
+
+										protected function textInputWidth_focusInHandler(event:FocusEvent):void
+										{
+											
+											IME.enabled=true;
+										}
+
+									]]>
+									
+								</fx:Script>
+								<s:TextInput width="100%" id="textInputWidth" change="textInputWidth_changeHandler(event)" focusIn="textInputWidth_focusInHandler(event)" />
+							</mx:HBox>
+						</fx:Component>
+					</mx:itemEditor>
+				</mx:DataGridColumn>
+				<mx:DataGridColumn headerText="Label" dataField="label">
+					
+					<mx:itemEditor>
+						<fx:Component>
+							<mx:HBox>
+								<fx:Script>
+									<![CDATA[
+										import spark.events.TextOperationEvent;
+										public function get text():Object{
+											
+											return textInputWidth.text;
+										}
+										override public function set data(value:Object):void{
+											textInputWidth.text = value.label;
+											textInputWidth.setFocus();
+										}
+
+
+										
+										protected function textInputWidth_changeHandler(event:TextOperationEvent):void
+										{
+											outerDocument.setInitData(1,textInputWidth.text);
+										}
+										
+										protected function textInputWidth_focusInHandler(event:FocusEvent):void
+										{
+											
+											IME.enabled=true;
+										}
+									]]>
+									
+								</fx:Script>
+								<s:TextInput width="100%" id="textInputWidth" change="textInputWidth_changeHandler(event)" focusIn="textInputWidth_focusInHandler(event)"/>
+							</mx:HBox>
+						</fx:Component>
+					</mx:itemEditor>
+				</mx:DataGridColumn>
+			</mx:columns>
+			<mx:dataProvider>
+				{initData}
+			</mx:dataProvider>
+		</mx:DataGrid>
+		<mx:Image x="408" y="16" source="../asserts/add.png" id="addImg" click="addImg_clickHandler(event)" useHandCursor="true" buttonMode="true"/>
+		<mx:Image x="434" y="16" source="../asserts/minus.png" id="minusImg" click="minusImg_clickHandler(event)" useHandCursor="true" buttonMode="true"/>
+		</ui:TitledBorderBox>
+		<s:Button x="357" y="424" label="确定" id="okBtn" click="okBtn_clickHandler(event)"/>
+		<s:Button x="435" y="424" label="取消" id="cancelBtn" click="cancelBtn_clickHandler(event)"/>
+		
+	</s:TitleWindow>
+</s:Group>

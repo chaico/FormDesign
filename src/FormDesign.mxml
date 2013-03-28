@@ -1,0 +1,2579 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			   xmlns:s="library://ns.adobe.com/flex/spark" 
+			   xmlns:mx="library://ns.adobe.com/flex/mx" minWidth="955" minHeight="600" creationComplete="init()" xmlns="*" xmlns:controls="controls.*" xmlns:dsp="tags.*" xmlns:sub="sub.*" >
+	<fx:Style source="css.css"/>
+	<fx:Script>  
+		<![CDATA[
+			import com.adobe.serialization.json.JSONDecoder;
+			
+			import components.InputField;
+			import components.InputLabel;
+			import components.MoveImg;
+			import components.STButton;
+			import components.STCheckBox;
+			import components.STCombobox;
+			import components.STImage;
+			import components.STRadioButton;
+			import components.TextArea;
+			
+			import mx.charts.renderers.DiamondItemRenderer;
+			import mx.collections.ArrayCollection;
+			import mx.collections.XMLListCollection;
+			import mx.containers.TitleWindow;
+			import mx.controls.Alert;
+			import mx.controls.Button;
+			import mx.controls.Label;
+			import mx.controls.TextInput;
+			import mx.controls.listClasses.ListBaseContentHolder;
+			import mx.core.UIComponent;
+			import mx.core.UITextField;
+			import mx.events.CloseEvent;
+			import mx.events.ColorPickerEvent;
+			import mx.events.DataGridEvent;
+			import mx.events.DragEvent;
+			import mx.events.FlexEvent;
+			import mx.events.IndexChangedEvent;
+			import mx.events.ListEvent;
+			import mx.managers.CursorManager;
+			import mx.managers.PopUpManager;
+			import mx.managers.PopUpManagerChildList;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			import ru.yelbota.flex.as3jobs.Job;
+			import ru.yelbota.flex.as3jobs.libs.JobUrlLoader;
+			
+			import spark.components.ComboBox;
+			
+			import sub.DataGridManager;
+			import sub.DataSourceAdd;
+			import sub.Loading;
+			
+			import sys.Config;
+			
+			import tags.Table;
+			import tags.Td;
+			import tags.Tr;
+			
+			import tools.TableTool;
+			public var dataBaseArr: ArrayCollection = new ArrayCollection();
+			public var workflowArr: ArrayCollection = new ArrayCollection();
+			private var viewFieldXML:String =null;
+			public var customScriptKind: ArrayCollection = new ArrayCollection(  
+				[  
+					{label:"操作表单",data:"1"},    
+					{label:"列表表单",data:"2"}]);
+			public var dataType: ArrayCollection = new ArrayCollection(  
+				[{label:"NUMBER", data:"NUMBER"},   
+					{label:"VARCHAR2", data:"VARCHAR2"},   
+					{label:"DATE", data:"DATE"},   
+					{label:"CHAR", data:"CHAR"} ,   
+					{label:"CLOB", data:"CLOB"} ,   
+					{label:"BLOB", data:"BLOB"} ,   
+					{label:"TIMESTAMP", data:"TIMESTAMP"}  ]);
+			
+			public var alignData: ArrayCollection = new ArrayCollection(  
+				[  
+					{label:"left",data:"left"},    
+					{label:"center",data:"center"} ,
+					{label:"right",data:"right"}]);
+			public var booleanData: ArrayCollection = new ArrayCollection(  
+				[  
+					{label:"true",data:"true"},    
+					{label:"false",data:"false"}]);
+			public var isTypeData: ArrayCollection = new ArrayCollection(  
+				[  
+					{label:"text",data:"text"},    
+					{label:"password",data:"password"},    
+					{label:"file",data:"file"},    
+					{label:"comboGrid",data:"comboGrid"}]);
+			public var btnTypeData: ArrayCollection = new ArrayCollection(  
+				[  {label:"",data:""},
+					{label:"Add",data:"Add"},    
+					{label:"Delete",data:"Delete"}]);
+			private var textLabel:Label = new Label();
+			private var loading:Loading = new Loading();
+			private var properties: ArrayCollection = new ArrayCollection();
+			public var focusObj:Object;
+			public var iconsObject:Object = new Object();
+			private var tableTool :TableTool;
+			private var mergecellTable:Table;
+			private var moveImg:MoveImg;
+			private var titleWindow:TitleWindow;
+			public var addPoint:Point;
+			public var addTarget:Object;
+			public var dataSourceArr:Array=new Array();
+			public var config:Config = new Config();
+			public var treeXmlData:XMLListCollection;
+			private var xmlTextArea_changeFlag:Boolean;
+			
+			private var xmlChangeData:Array = new Array();
+			private var xmlChangeDataZ:Array = new Array();
+			private var firstUpdateComplete:Boolean = true;
+			private var changeLogFlag:Boolean = true;
+			private function init():void{
+				setIcons2Object();
+				event();
+				panelDataSource.formDesign =this;
+				htmlDesign.addEventListener(MouseEvent.MOUSE_DOWN,function():void{
+					changeLogFlag=false;
+				});
+				htmlDesign.addEventListener(MouseEvent.MOUSE_UP,function():void{
+					changeLogFlag=true;
+				});
+				htmlDesign.addEventListener(FlexEvent.UPDATE_COMPLETE,changeDataLog);
+				//this.addEventListener(KeyboardEvent.KEY_DOWN,CtrlZY);
+				
+				if(viewManager==null){
+					viewSet.createDeferredContent();
+					
+				}
+				if(customSourceTextArea==null){
+					customSource.createDeferredContent();
+					
+				}
+				WordflowsSend();
+			}
+			//记录修改历史记录值
+			private function changeDataLog(event:FlexEvent):void{
+				if(!changeLogFlag){
+					return;
+				}
+				if(!firstUpdateComplete){
+					if(xmlChangeData.length>50){
+						xmlChangeData.shift();
+					}
+					xmlChangeData.push(this.toXML()); 	
+					xmlChangeDataZ = new Array();
+				}
+				this.setRedoAndUndoImg();
+				firstUpdateComplete=false;
+				//Alert.show(xmlChangeData.length+"");
+			}
+			//ctrl+z ctrl+y
+			private function redoAndUndo(reUnFlag:int):void{
+				
+				if(reUnFlag==1 && undo.source.indexOf("disabled")!=-1){
+					return;					
+				}else if(reUnFlag==2  && redo.source.indexOf("disabled")!=-1){
+					return;					
+				}
+				htmlDesign.removeEventListener(FlexEvent.UPDATE_COMPLETE,changeDataLog);
+				//trace(event.ctrlKey +""+ event.keyCode);
+				if(xmlTextArea==null){
+					xmlSource.createDeferredContent();
+					
+				}
+				if(reUnFlag==1){
+					if(xmlChangeData.length>0){
+						if(xmlChangeData.length>1){
+							var xmlSTr:String = xmlChangeData[xmlChangeData.length-2]; 
+							xmlChangeDataZ.push(xmlChangeData[xmlChangeData.length-1]);
+							xmlChangeData.pop();
+							xmlTextArea.text = xmlSTr;
+						}else{
+							xmlChangeDataZ.push(this.toXML());
+							xmlChangeData.pop();
+							xmlTextArea.text="";
+						}
+						this.toDesign();
+					}
+				}else if(reUnFlag==2){		
+					
+					if(xmlChangeDataZ.length>0){
+						var xmlSTr:String = xmlChangeDataZ[xmlChangeDataZ.length-1]; 
+						xmlChangeDataZ.pop();
+						xmlChangeData.push(xmlSTr);
+						xmlTextArea.text = xmlSTr;
+						this.toDesign();
+					}
+				}
+				this.setRedoAndUndoImg();
+				htmlDesign.addEventListener(FlexEvent.UPDATE_COMPLETE,addChangeDataLog);
+			}
+			//添加事件 
+			private function addChangeDataLog (event:FlexEvent):void{
+				htmlDesign.removeEventListener(FlexEvent.UPDATE_COMPLETE,addChangeDataLog);
+				htmlDesign.addEventListener(FlexEvent.UPDATE_COMPLETE,changeDataLog);
+			}
+			private function setRedoAndUndoImg():void{
+				if(xmlChangeData.length<=0){					
+					undo.source='../asserts/undo_disabled.png';
+				}else{							
+					undo.source='../asserts/undo.png';
+				}
+				if(xmlChangeDataZ.length==0){		
+					redo.source='../asserts/redo_disabled.png';			
+				}else{		
+					redo.source='../asserts/redo.png';	
+				}
+				
+			}
+			private function getMousePoint(event:*):Point{
+				
+				var viewidX:Number = event.localX+(htmlDesign.horizontalScrollBar!=null?htmlDesign.horizontalScrollBar.scrollPosition:0);
+				var viewidY:Number =event.localY+(htmlDesign.verticalScrollBar!=null?htmlDesign.verticalScrollBar.scrollPosition:0);
+				return new Point(viewidX,viewidY);
+			}
+			private function event():void{
+				var me:FormDesign=this;
+				htmlDesign.addEventListener(MouseEvent.MOUSE_DOWN,function(event:MouseEvent):void{
+					if(icons.selectedItem!=null ){
+						try{
+							addPoint = new Point(event.target.contentMouseX,event.target.contentMouseY);
+						}catch(e:*){
+						}
+						addTarget = event.target;
+						if( icons.selectedItem.iconName=="table"){
+							addTable(event);
+						}else if(icons.selectedItem.iconName=="label"){
+							addModule(event.target,0);
+						}else if(icons.selectedItem.iconName=="inputField"){
+							addModule(event.target,1);
+						}else if(icons.selectedItem.iconName=="textArea"){
+							addModule(event.target,2);
+						}else if(icons.selectedItem.iconName=="button"){
+							addModule(event.target,3);
+						}else if(icons.selectedItem.iconName=="checkBox"){
+							addModule(event.target,4);
+						}else if(icons.selectedItem.iconName=="comboBox"){
+							addModule(event.target,5);
+						}else if(icons.selectedItem.iconName=="radioButton"){
+							addModule(event.target,6);
+						}else if(icons.selectedItem.iconName=="image"){
+							addModule(event.target,7);
+						}else if(icons.selectedItem.iconName=="DataGrid"){
+							var dsa:DataGridManager = new DataGridManager();
+							dsa.formDesign =me; 
+							PopUpManager.addPopUp(dsa, hdbox, true); 
+							PopUpManager.centerPopUp(dsa); 
+						}
+					}
+					
+				});
+				
+				
+				htmlDesign.addEventListener(MouseEvent.MOUSE_UP,function(event:MouseEvent):void{
+					//tdSplitcell=null;
+					if(icons.selectedIndex==iconsObject["select"].index && event.target.parent is Td ){
+						var td:Td = event.target.parent as Td;
+						focusObj =event.target.parent.parent.parent;
+						//tdSplitcell = td;
+					}
+					if(event.target.parent.parent is InputLabel 
+						|| event.target.parent.parent is InputField 
+						|| event.target.parent.parent is components.TextArea ){						
+						focusObj =event.target.parent.parent;
+					}else if(event.target.parent is STButton || event.target.parent is STCheckBox || event.target.parent is STRadioButton){
+						focusObj =event.target.parent;
+					}else if(event.target.parent.parent is STImage){
+						focusObj =event.target.parent.parent;
+					}else if(event.target.parent.parent is STCombobox){
+						focusObj =event.target.parent.parent;
+					}
+					//如果焦点的不是表，并且表的选择列数大于1就把焦点设定为表
+					if(!(focusObj is Table) &&　focusObj!=null){
+						var t_table:Table  = focusObj.parent.parent.parent.parent as Table;
+						if(t_table!=null && t_table.selectedTd.length>0){
+							focusObj = t_table;
+						}
+					}
+					if(focusObj is Table){
+						
+						var table:Table = focusObj as Table;
+						table.selectedTdOne = event.target.parent as Td;
+						if(table.selectedTdOne!=null && (table.selectedTdOne.rowSpan>1 || table.selectedTdOne.colSpan>1)){
+							splitcell.source='../asserts/splitcell.png';
+							splitcell.addEventListener(MouseEvent.CLICK,splitcellFun);
+						}else{
+							splitcell.source='../asserts/splitcell_disabled.png';
+							splitcell.removeEventListener(MouseEvent.CLICK,splitcellFun);
+						}
+						mergecellTable = table;
+						//trace(table.selectedTd+"")
+						if(table.selectedTd!=null && table.selectedTd.length>0){
+							mergecell.source='../asserts/mergecell.png';
+							mergecell.addEventListener(MouseEvent.CLICK,mergecellFun);
+							
+						}else{
+							mergecell.source='../asserts/mergecell_disabled.png';
+							mergecell.removeEventListener(MouseEvent.CLICK,mergecellFun);
+							
+						}
+						//可用
+						//向上插入方法
+						addrowup.source='../asserts/inserttop.png';
+						addrowup.addEventListener(MouseEvent.CLICK,addRowFun);						
+						
+						//向下插入方法
+						addrowdown.source='../asserts/insertbottom.png';
+						addrowdown.addEventListener(MouseEvent.CLICK,addRowFun);
+						
+						//向左插入方法
+						addcellleft.source='../asserts/insertcellleft.png';
+						addcellleft.addEventListener(MouseEvent.CLICK,addCellFun);
+						
+						//向右插入方法
+						addcellright.source='../asserts/insertcell.png';
+						addcellright.addEventListener(MouseEvent.CLICK,addCellFun);
+						
+						//删除行方法
+						deleterow.source='../asserts/deleterow.png';
+						deleterow.addEventListener(MouseEvent.CLICK,RemoveRowFun);
+						
+						//删除列方法
+						deletecell.source='../asserts/deletecell.png';
+						deletecell.addEventListener(MouseEvent.CLICK,RemoveCellFun);
+						
+					}else{
+						//不可以 
+						//向上插入方法
+						addrowup.source='../asserts/inserttop_disabled.png';
+						addrowup.removeEventListener(MouseEvent.CLICK,addRowFun);
+						
+						//向下插入方法
+						addrowdown.source='../asserts/insertbottom_disabled.png';
+						addrowdown.removeEventListener(MouseEvent.CLICK,addRowFun);
+						
+						//向左插入方法
+						addcellleft.source='../asserts/insertcellleft_disabled.png';
+						addcellleft.removeEventListener(MouseEvent.CLICK,addCellFun);
+						
+						//向右插入方法
+						addcellright.source='../asserts/insertcell_disabled.png';
+						addcellright.removeEventListener(MouseEvent.CLICK,addCellFun);
+						
+						//删除行方法
+						deleterow.source='../asserts/deleterow_disabled.png';
+						deleterow.removeEventListener(MouseEvent.CLICK,RemoveRowFun);
+						
+						//删除列方法
+						deletecell.source='../asserts/deletecell_disabled.png';
+						deletecell.removeEventListener(MouseEvent.CLICK,RemoveCellFun);
+					}
+					if(focusObj!=null &&  focusObj!=moveImg && focusObj!=htmlDesign){
+						remove.source='../asserts/remove.png';
+					}
+					//添加移动按钮
+					addMoveimgFun(event);
+					setProperties();
+					//icons.selectedIndex = iconsObject["select"].index;
+				});
+				//删除焦点
+				remove.addEventListener(MouseEvent.CLICK,function(event:MouseEvent):void{
+					if(focusObj!=null){
+						//var msg:String="是否确定删除对象？";
+						//Alert.show(msg,"警告",Alert.OK|Alert.CANCEL,null,function (e:CloseEvent):void{
+						//	if(e.detail==Alert.OK){
+								focusObj.parent.removeChild(focusObj);
+								focusObj=null;
+								remove.source='../asserts/remove_disabled.png';
+								
+								try{
+									moveImg.parent.removeChild(moveImg);
+								}catch(e:*){
+									
+								}
+						//	}
+						//},null,Alert.OK);
+					}
+				});
+				this.addFieldEvent();
+				this.changeWHEvent();
+			}
+			//**改变宽高事件
+			private function changeWHEvent():void{
+				var changeWFlag:Boolean;
+				var changeHFlag:Boolean;
+				var changeObj:Object=null;
+				htmlDesign.addEventListener(MouseEvent.MOUSE_DOWN,function(event:MouseEvent):void{
+					
+					
+					if(changeObj!=null &&  changeObj!=moveImg && changeObj!=htmlDesign){
+						var addY:Number =-4;
+						var addW:Number =10;
+						var addH:Number =5;
+						if(changeObj is Table || changeObj is Td){
+							addY = 4;
+						}
+						if(changeObj.contentMouseX+4 > changeObj.width-addW  && changeObj.contentMouseX+4 <= changeObj.width){
+							changeWFlag=true;
+						}else if(changeObj.contentMouseY+addY > changeObj.height-addH  && changeObj.contentMouseY+addY <= changeObj.height){
+							changeHFlag=true;
+						}
+					}
+				});
+				addEventListener(MouseEvent.MOUSE_UP,function(event:MouseEvent):void{
+					changeWFlag=false;
+					changeHFlag=false;
+					removeCursor();
+				});
+				htmlDesign.addEventListener(MouseEvent.MOUSE_MOVE,function(event:MouseEvent):void{
+					if(!changeWFlag && !changeHFlag){
+						changeObj = focusObj;
+						if(event.target.parent is Td){
+							var td:Td = event.target.parent as Td;
+							changeObj =td;
+						}
+					}
+					if(changeObj!=null &&  changeObj!=moveImg && changeObj!=htmlDesign){
+						if(changeWFlag==true){
+							if(changeObj is Td){
+								var td:Td = changeObj as Td;
+								var table:Table = td.parent.parent as Table;
+								td.width = table.contentMouseX-td.x+4;
+								table.go_measure();
+							}else{
+								changeObj.width = changeObj.contentMouseX+4;
+							}
+						}else if(changeHFlag==true){
+							
+							if(changeObj is Td){
+								var td:Td = changeObj as Td;
+								var tr:Tr = changeObj.parent as Tr;
+								var table:Table = td.parent.parent as Table;
+								tr.height = table.contentMouseY-tr.y+4;
+								table.go_measure();
+							}else{
+								changeObj.height = changeObj.contentMouseY+4;
+							}
+						}else{
+							
+							var addY:Number =-4;
+							var addW:Number =10;
+							var addH:Number =5;
+							if(changeObj is Table || changeObj is Td){
+								addY = 4;
+							}
+							//trace((changeObj.contentMouseY+addY)+"||"+(changeObj.height-addH) +"||"+ (changeObj.contentMouseY+addY )+"||"+changeObj.height)
+							if(changeObj.contentMouseX+4 > changeObj.width-addW && changeObj.contentMouseX+4 <= changeObj.width){
+								Horz(-10,0)  
+							}else if(changeObj.contentMouseY+addY > changeObj.height-addH  && changeObj.contentMouseY+addY <= changeObj.height){
+								Vert(0,-10); 
+							}else{
+								removeCursor();
+							}
+						}
+					}else{
+						
+						removeCursor();
+					}
+					
+					
+				});
+			}
+			
+			//add tool
+			private function addTool(xOffset:Number,yOffset:Number):void{
+				[Embed(source="asserts/addtool.png")]  
+				var curhorat:Class;   
+				CursorManager.setCursor(curhorat,2,xOffset,yOffset);
+				
+			}
+			//垂直调整
+			private function Vert(xOffset:Number,yOffset:Number):void{
+				[Embed(source="asserts/pan_vert.png")]  
+				var curvert:Class;   
+				CursorManager.setCursor(curvert,2,xOffset,yOffset); 
+				
+			}
+			//水平调整
+			private function Horz(xOffset:Number,yOffset:Number):void{
+				[Embed(source="asserts/pan_horz.png")]  
+				var curhorz:Class;   
+				CursorManager.setCursor(curhorz,2,xOffset,yOffset);
+				
+			}
+			private function addFieldEvent(){
+				textLabel.name="label_text";
+				textLabel.height=25;
+				textLabel.visible=false;
+				dataSourceTree.addEventListener(MouseEvent.MOUSE_DOWN,function():void{
+					if(dataSourceTree.selectedItem!=null && (dataSourceTree.selectedItem as XML).localName()+""=="field"){
+						textLabel.text = dataSourceTree.selectedItem.@name;
+						htmlDesign.addEventListener(MouseEvent.MOUSE_MOVE,moveTextLabel);
+						icons.selectedIndex=iconsObject["inputField"].index
+						htmlDesign.addChild(textLabel);
+					}
+				});
+				addEventListener(MouseEvent.MOUSE_UP,function(event:MouseEvent):void{
+					try{
+						if(textLabel.visible==true){
+							icons.selectedIndex=iconsObject["select"].index;
+							htmlDesign.removeEventListener(MouseEvent.MOUSE_MOVE,moveTextLabel);
+							textLabel.visible=false;
+							htmlDesign.removeChild(textLabel);
+							
+						}
+					}catch(e:*){
+					}
+				});
+				htmlDesign.addEventListener(MouseEvent.MOUSE_UP,function(event:MouseEvent):void{
+					try{						
+						addPoint = new Point(event.target.contentMouseX,event.target.contentMouseY);
+					}catch(e:*){
+					}
+					if(textLabel.visible==true){
+						try{
+							htmlDesign.removeEventListener(MouseEvent.MOUSE_MOVE,moveTextLabel);
+							textLabel.visible=false;
+							htmlDesign.removeChild(textLabel);
+						}catch(e:*){
+						}
+						//addTarget = event.target;
+						addModule(event.target,1);
+						
+						var inputField: InputField =focusObj as InputField;
+						//inputField.text=dataSourceTree.selectedItem.@name;
+						inputField.source=dataSourceTree.selectedItem.@source;
+						inputField.dataType = dataSourceTree.selectedItem.@dataType;
+						inputField.dataDisplaySize = dataSourceTree.selectedItem.@dataDisplaySize;
+						inputField.field = dataSourceTree.selectedItem.@name;
+						inputField.inputFieldName = dataSourceTree.selectedItem.@source+"_"+dataSourceTree.selectedItem.@name;
+						
+						icons.selectedIndex=iconsObject["select"].index
+					}
+				});
+				
+			}
+			private function moveTextLabel(event):void{
+				textLabel.visible=true;
+				textLabel.x = htmlDesign.contentMouseX+10;
+				textLabel.y = htmlDesign.contentMouseY+10;
+			} 
+			//添加LABEL或TEXTFIELD
+			public function addModule(target:Object,flag:Number=0):Object{
+				if(target is UITextField || target is Button){
+					return null;
+				}
+				var t_x:Number = addPoint.x;
+				var t_y:Number = addPoint.y;
+				var t_width:Number=80;
+				if(target.parent is Td){
+					var t_canvas:Canvas = target as Canvas;
+					var lable_height:Number =0;
+					for(var i:int=0;i<t_canvas.numChildren;i++){
+						if(t_canvas.getChildAt(i) is InputLabel){
+							var inputlabel:InputLabel = t_canvas.getChildAt(i) as InputLabel;
+							lable_height += inputlabel.textArea.height;
+						}else if(  t_canvas.getChildAt(i) is InputField){
+							var inputField:InputField = t_canvas.getChildAt(i) as InputField;
+							lable_height += inputField.height;
+						}else if(  t_canvas.getChildAt(i) is components.TextArea){
+							var textarea:components.TextArea = t_canvas.getChildAt(i) as components.TextArea;
+							lable_height += textarea.height;
+						}else if(  t_canvas.getChildAt(i) is STButton){
+							var stbutton:STButton = t_canvas.getChildAt(i) as STButton;
+							lable_height += stbutton.height;
+						}else if(  t_canvas.getChildAt(i) is STImage){
+							var sTImage:STImage = t_canvas.getChildAt(i) as STImage;
+							lable_height += sTImage.height;
+						}else if(  t_canvas.getChildAt(i) is STCheckBox){
+							var stCheckBox:STCheckBox = t_canvas.getChildAt(i) as STCheckBox;
+							lable_height += stCheckBox.height;
+						}else if(  t_canvas.getChildAt(i) is STCombobox){
+							var stcomboBox:STCombobox = t_canvas.getChildAt(i) as STCombobox;
+							lable_height += stcomboBox.height;
+						}else if(  t_canvas.getChildAt(i) is STRadioButton){
+							var stRadioButton:STRadioButton = t_canvas.getChildAt(i) as STRadioButton;
+							lable_height += stRadioButton.height;
+						}
+					}
+					t_x = 0;
+					t_y = lable_height;
+					t_width = target.parent.width;
+				}
+				if(!(target is Table) && !(target is Tr)  && !(target is Td)){
+					if(flag==0){
+						var inputLabel:InputLabel = new InputLabel();
+						inputLabel.x=t_x;
+						inputLabel.y=t_y;
+						inputLabel.width=t_width;
+						target.addChild(inputLabel);
+						focusObj = inputLabel;
+					}else if(flag==1)
+					{
+						var inputField:InputField = new InputField();
+						inputField.x=t_x;
+						inputField.y=t_y;
+						inputField.width=t_width;
+						target.addChild(inputField);
+						focusObj = inputField;
+					}else if(flag==2)
+					{
+						if(t_width<=50){
+							t_width=200;
+						}
+						var textArea:components.TextArea = new components.TextArea();
+						textArea.x=t_x;
+						textArea.y=t_y;
+						textArea.width=t_width;
+						target.addChild(textArea);
+						focusObj = textArea;
+					}else if(flag==3)
+					{
+						if(t_width<=50){
+							t_width=100;
+						}
+						var stbutton :STButton = new STButton();
+						stbutton.x=t_x;
+						stbutton.y=t_y;
+						stbutton.label="Button";
+						stbutton.width=100;
+						target.addChild(stbutton);
+						focusObj = stbutton;
+					}else if(flag==4)
+					{
+						if(t_width<=50){
+							t_width=100;
+						}
+						var stCheckBox :STCheckBox = new STCheckBox();
+						stCheckBox.x=t_x;
+						stCheckBox.y=t_y;
+						stCheckBox.label="CheckBox";
+						stCheckBox.width=100;
+						target.addChild(stCheckBox);
+						focusObj = stCheckBox;
+					}else if(flag==5)
+					{
+						if(t_width<=50){
+							t_width=100;
+						}
+						var stcomboBox :STCombobox = new STCombobox();
+						stcomboBox.x=t_x;
+						stcomboBox.y=t_y;
+						stcomboBox.width=100;
+						target.addChild(stcomboBox);
+						focusObj = stcomboBox;
+					}else if(flag==6)
+					{
+						if(t_width<=50){
+							t_width=100;
+						}
+						var stRadioButton :STRadioButton = new STRadioButton();
+						stRadioButton.x=t_x;
+						stRadioButton.y=t_y;
+						stRadioButton.width=100;
+						target.addChild(stRadioButton);
+						focusObj = stRadioButton;
+					}else if(flag==7)
+					{
+						if(t_width<=50){
+							t_width=100;
+						}
+						var sTImage :STImage = new STImage();
+						sTImage.x=t_x;
+						sTImage.y=t_y;
+						sTImage.title="";
+						sTImage.width=100;
+						target.addChild(sTImage);
+						focusObj = sTImage;
+					}
+					//改变TD的宽高
+					if(target.parent is Td){
+						var td:Td = target.parent  as Td;
+						var tr:Tr = target.parent.parent  as Tr;
+						if(td.width<t_y+focusObj.width){
+							td.width = t_x+focusObj.width;
+						}
+						if(tr.height<t_y+focusObj.height){
+							tr.height = t_y+focusObj.height+10;
+						}
+					}
+				}
+				return focusObj;
+			}
+			//添加表格
+			private function addTable(event:MouseEvent):void{
+				if(event.target is UITextField){
+					return;
+				}
+				var canvas:Canvas = new Canvas();
+				var label:Label = new Label(); 
+				var rowsInput:TextInput = new TextInput(); 
+				var colsInput:TextInput = new TextInput(); 
+				var button:Button = new Button(); 
+				
+				titleWindow = new TitleWindow(); 
+				titleWindow.title = "添加表格"; 
+				titleWindow.showCloseButton = true; 
+				titleWindow.width = 240; 
+				titleWindow.height = 180; 
+				titleWindow.addEventListener(CloseEvent.CLOSE, titleWindow_close); 
+				
+				label.text = "行数："; 
+				label.y=0;
+				label.x=40;
+				rowsInput.text="4";
+				rowsInput.width=80;
+				rowsInput.maxChars=2;
+				rowsInput.x=80;
+				rowsInput.restrict="[0-9]*$";
+				canvas.addChild(label); 
+				canvas.addChild(rowsInput);
+				
+				label= new Label();
+				label.text = "列数："; 
+				label.y=30;
+				label.x=40;
+				colsInput= new TextInput();
+				colsInput.text="4";
+				colsInput.width=80;
+				colsInput.maxChars=2;
+				colsInput.x=80;
+				colsInput.y=30;
+				colsInput.restrict="[0-9]*$";
+				canvas.addChild(label); 				
+				canvas.addChild(colsInput);
+				
+				button.label="确定";
+				button.x=40;
+				button.y=90;
+				button.addEventListener(MouseEvent.CLICK,function():void{
+					if(rowsInput.text=="" || new Number(rowsInput.text)==0){
+						Alert.show("请输入行数！");
+						return;
+					}else if(new Number(rowsInput.text)>20){
+						Alert.show("最大行数只能是20行！");
+						return;
+					}else if(colsInput.text=="" || new Number(colsInput.text)==0){
+						Alert.show("请输入列数！");
+						return;
+					}else if(new Number(colsInput.text)>20){
+						Alert.show("最大列数只能是20列！");
+						return;
+					}
+					titleWindow_close(); 
+					addTableOK(new Number(rowsInput.text),new Number(colsInput.text));
+				});
+				canvas.addChild(button);
+				button = new Button();
+				button.label="取消";
+				button.x=120;
+				button.y=90;
+				button.addEventListener(MouseEvent.CLICK,function():void{
+					titleWindow_close(); 
+					
+				});
+				canvas.addChild(button);
+				
+				
+				titleWindow.addChild(canvas);
+				
+				PopUpManager.addPopUp(titleWindow, hdbox, true); 
+				PopUpManager.centerPopUp(titleWindow); 
+				
+			}
+			//确认按钮后添加表
+			public function addTableOK(rows:Number,cols:Number):Table{
+				
+				//var mousePoint:Point = getMousePoint(addEvent);
+				var table:Table = new Table(rows,cols);
+				table.x=addPoint.x;
+				table.y=addPoint.y;
+				table.htmlDesign = htmlDesign;
+				if(!(addTarget is Table) && !(addTarget is Tr)  && !(addTarget is Td)){
+					addTarget.addChild(table);
+					
+					focusObj = table;
+				}
+				icons.selectedIndex = iconsObject["select"].index;
+				return table;
+			}
+			//关闭弹出对话框
+			private function titleWindow_close(event:CloseEvent=null):void { 
+				PopUpManager.removePopUp(titleWindow); 
+				
+				
+				
+			} 
+			//合并
+			private function mergecellFun(event:MouseEvent):void{
+				mergecellTable.merge();
+				mergecell.source='../asserts/mergecell_disabled.png';
+				mergecellTable=null;
+				mergecell.removeEventListener(MouseEvent.CLICK,mergecellFun);
+			}
+			//拆分
+			private function splitcellFun(event:MouseEvent):void{
+				if(mergecellTable!=null){
+					mergecellTable.split(mergecellTable.selectedTdOne);
+					splitcell.source='../asserts/splitcell_disabled.png';
+					mergecellTable=null;
+					splitcell.removeEventListener(MouseEvent.CLICK,splitcellFun);
+				}
+			}
+			//插入行
+			public function addRowFun(event:MouseEvent):void{
+				
+				if(focusObj is Table){
+					var table:Table = focusObj as Table;
+					table.addRowFun(event);
+				}
+			}
+			//插入列
+			public function addCellFun(event:MouseEvent):void{
+				if(focusObj is Table){
+					var table:Table = focusObj as Table;
+					table.addCellFun(event);
+				}
+			}
+			//删除行
+			public function RemoveRowFun(event:MouseEvent):void{
+				
+				if(focusObj is Table){
+					var table:Table = focusObj as Table;
+					table.RemoveRowFun(event);
+				}
+			}
+			//删除列
+			public function RemoveCellFun(event:MouseEvent):void{
+				
+				if(focusObj is Table){
+					var table:Table = focusObj as Table;
+					table.RemoveCellFun(event);
+				}
+			}
+			private function addMoveimgFun(event:MouseEvent):void{
+				if(icons.selectedItem!=null && icons.selectedItem.iconName!="select"){
+					return;
+				}
+				if(moveImg==null && focusObj!=null ){
+					moveImg =new MoveImg()
+					moveImg.name="moveBtns"
+					addEventListener(MouseEvent.MOUSE_MOVE,function(event:MouseEvent):void{
+						if(moveImg.moveflag && moveImg.focusObj!=null &&  moveImg.focusObj!=htmlDesign){
+							var mousePoint:Point =new Point(moveImg.focusObj.parent.contentMouseX,moveImg.focusObj.parent.contentMouseY)
+							//mouseChildren=false;
+							moveImg.x=mousePoint.x-10;
+							moveImg.y=mousePoint.y-10;
+							moveImg.focusObj.x=mousePoint.x;
+							moveImg.focusObj.y=mousePoint.y;
+						}
+					});
+					addEventListener(MouseEvent.MOUSE_UP,function():void{
+						moveImg.moveflag=false;
+					});
+				}
+				if(focusObj!=null){
+					moveImg.x = focusObj.x;
+					moveImg.y = focusObj.y-15;
+					moveImg.focusObj = focusObj;
+				}
+				
+				try{
+					moveImg.parent.removeChild(moveImg);
+				}catch(e:*){
+					
+				}
+				if(focusObj!=null && focusObj!=moveImg && focusObj!=htmlDesign){
+					if(getChildByName(moveImg.name)==null){
+						
+						try{
+							focusObj.parent.addChild(moveImg);
+						}catch(e:*){
+							
+						}
+					}
+					
+				}
+			}
+			private function moveEvent(event:MouseEvent):void{
+				var mousePoint:Point = getMousePoint(event);
+				if(moveImg.moveflag && mousePoint!=null && focusObj!=null){
+					mouseChildren=false;
+					moveImg.x=mousePoint.x-10;
+					moveImg.y=mousePoint.y-10-viewstack1.y;
+					//trace(focusObj);
+					focusObj.x=mousePoint.x;
+					focusObj.y=mousePoint.y-viewstack1.y;
+				}
+			}
+			private function moveClear(event:MouseEvent):void{
+				moveImg.moveflag=false;
+				mouseChildren=true;
+			} 
+			private function setProperties(): void{
+				properties.removeAll();
+				
+				if(focusObj is Table){
+					var table:Table = focusObj  as Table;
+					if(table.tableId==null){
+						table.tableId = table.name;
+					}
+					properties.addItem({ui:"table",id:"id",name: "表ID", value:table.tableId});
+					properties.addItem({ui:"table",id:"width",name: "表宽", value: table.width});	
+					//properties.addItem({ui:"table",id:"height",name: "表高", value: table.height});
+					properties.addItem({ui:"table",id:"x",name: "X坐标", value: table.x});	
+					properties.addItem({ui:"table",id:"y",name: "Y坐标", value: table.y});	
+					properties.addItem({ui:"table",id:"isDataGrid",name: "DataGrid", value: table.isDataGrid});
+					properties.addItem({ui:"table",id:"source",name: "数据源", value: table.source});
+					if(table.selectedTdOne!=null && table.selectedTd.length==0){
+						var tr:Tr = table.selectedTdOne.parent  as Tr;
+						if(tr.trId==null){
+							tr.trId = tr.name;
+						}
+						if(table.selectedTdOne.tdId==null){
+							table.selectedTdOne.tdId= table.selectedTdOne.name;
+						}
+						if(tr!=null){
+							properties.addItem({ui:"tr",id:"id",name: "行ID", value: tr.trId});
+							//properties.addItem({ui:"tr",id:"width",name: "行宽", value: tr.width});
+							properties.addItem({ui:"tr",id:"height",name: "行高", value: tr.height});
+							properties.addItem({ui:"tr",id:"isDataGridDetail",name: "是否是明细", value: tr.isDataGridDetail});
+						}
+						if(table.selectedTdOne!=null){
+							properties.addItem({ui:"td",id:"id",name: "单元格ID", value: table.selectedTdOne.tdId});
+							properties.addItem({ui:"td",id:"width",name: "单元格宽", value: table.selectedTdOne.width});
+							//properties.addItem({ui:"td",id:"height",name: "单元格高", value: table.selectedTdOne.height});
+							
+						}
+					}		
+				}else if(focusObj is InputLabel){
+					var inputLabel:InputLabel = focusObj  as InputLabel;
+					if(inputLabel.inputLabelId==null){
+						inputLabel.inputLabelId = inputLabel.name;
+					}
+					properties.addItem({ui:"inputLabel",id:"id",name: "标签ID", value:inputLabel.inputLabelId});
+					properties.addItem({ui:"inputLabel",id:"x",name: "X坐标", value: inputLabel.x});	
+					properties.addItem({ui:"inputLabel",id:"y",name: "Y坐标", value: inputLabel.y});	
+					properties.addItem({ui:"inputLabel",id:"text",name: "Text", value: inputLabel.textArea.text});	
+					properties.addItem({ui:"inputLabel",id:"width",name: "宽", value: inputLabel.textArea.width});
+					properties.addItem({ui:"inputLabel",id:"height",name: "高", value: inputLabel.textArea.height});
+					properties.addItem({ui:"inputLabel",id:"textAlign",name: "文字对齐", value: inputLabel.textAlign});
+				}else if(focusObj is InputField){
+					var inputField:InputField = focusObj  as InputField;
+					if(inputField.inputFieldId==null){
+						inputField.inputFieldId = inputField.name;
+					}
+					properties.addItem({ui:"inputField",id:"id",name: "ID", value:inputField.inputFieldId});
+					properties.addItem({ui:"inputField",id:"name",name: "name", value:inputField.inputFieldName});
+					properties.addItem({ui:"inputField",id:"x",name: "X坐标", value: inputField.x});	
+					properties.addItem({ui:"inputField",id:"y",name: "Y坐标", value: inputField.y});	
+					properties.addItem({ui:"inputField",id:"text",name: "Text", value: inputField.text});	
+					properties.addItem({ui:"inputField",id:"width",name: "宽", value: inputField.width});
+					properties.addItem({ui:"inputField",id:"height",name: "高", value: inputField.height});			
+					properties.addItem({ui:"inputField",id:"hidden",name: "隐藏", value:inputField.hidden});		
+					properties.addItem({ui:"inputField",id:"readonly",name: "只读", value:inputField.readonly});
+					properties.addItem({ui:"inputField",id:"disabled",name: "不可用", value:inputField.disabled});
+					properties.addItem({ui:"inputField",id:"isNeed",name: "必输", value:inputField.isNeed});
+					properties.addItem({ui:"inputField",id:"source",name: "数据源", value:inputField.source});
+					properties.addItem({ui:"inputField",id:"field",name: "数据源字段", value:inputField.field});
+					properties.addItem({ui:"inputField",id:"initValue",name: "初始值", value:inputField.initValue});
+					properties.addItem({ui:"inputField",id:"isType",name: "输入框类型", value:inputField.isType});
+					properties.addItem({ui:"inputField",id:"dataType",name: "数据类型", value:inputField.dataType});
+					properties.addItem({ui:"inputField",id:"dataDisplaySize",name: "长度", value:inputField.dataDisplaySize});
+					properties.addItem({ui:"inputField",id:"textAlign",name: "文字对齐", value: inputField.textAlign});
+					properties.addItem({ui:"inputField",id:"customScript",name: "自定义脚本", value: inputField.customScript});
+					
+				}else if(focusObj is components.TextArea){
+					var textArea:components.TextArea = focusObj  as components.TextArea;
+					if(textArea.textAreaId==null){
+						textArea.textAreaId = textArea.name;
+					}
+					properties.addItem({ui:"textArea",id:"id",name: "多行输入框ID", value:textArea.textAreaId});
+					properties.addItem({ui:"textArea",id:"name",name: "name", value:textArea.textAreaName});
+					properties.addItem({ui:"textArea",id:"x",name: "X坐标", value: textArea.x});	
+					properties.addItem({ui:"textArea",id:"y",name: "Y坐标", value: textArea.y});	
+					properties.addItem({ui:"textArea",id:"text",name: "Text", value: textArea.text});	
+					properties.addItem({ui:"textArea",id:"width",name: "宽", value: textArea.width});
+					properties.addItem({ui:"textArea",id:"height",name: "高", value: textArea.height});			
+					properties.addItem({ui:"textArea",id:"hidden",name: "隐藏", value:textArea.hidden});
+					properties.addItem({ui:"textArea",id:"readonly",name: "只读", value:textArea.readonly});
+					properties.addItem({ui:"textArea",id:"disabled",name: "不可用", value:textArea.disabled})
+					properties.addItem({ui:"textArea",id:"isNeed",name: "必输", value:textArea.isNeed});
+					properties.addItem({ui:"textArea",id:"source",name: "数据源", value:textArea.source});
+					properties.addItem({ui:"textArea",id:"field",name: "数据源字段", value:textArea.field});
+					properties.addItem({ui:"textArea",id:"initValue",name: "初始值", value:textArea.initValue});
+					properties.addItem({ui:"textArea",id:"dataType",name: "数据类型", value:textArea.dataType});
+					properties.addItem({ui:"textArea",id:"dataDisplaySize",name: "长度", value:textArea.dataDisplaySize});
+					properties.addItem({ui:"textArea",id:"textAlign",name: "文字对齐", value: textArea.textAlign});
+					properties.addItem({ui:"textArea",id:"customScript",name: "自定义脚本", value: textArea.customScript});
+					;
+				}else if(focusObj is STButton){
+					var button:STButton = focusObj  as STButton;
+					if(button.buttonId==null){
+						button.buttonId = button.name;
+					}
+					properties.addItem({ui:"button",id:"id",name: "按钮ID", value:button.buttonId});
+					properties.addItem({ui:"button",id:"x",name: "X坐标", value: button.x});	
+					properties.addItem({ui:"button",id:"y",name: "Y坐标", value: button.y});	
+					properties.addItem({ui:"button",id:"label",name: "Label", value: button.label});	
+					properties.addItem({ui:"button",id:"width",name: "宽", value: button.width});
+					properties.addItem({ui:"button",id:"height",name: "高", value: button.height});			
+					properties.addItem({ui:"button",id:"hidden",name: "隐藏", value:button.hidden});
+					properties.addItem({ui:"button",id:"disabled",name: "不可用", value:button.disabled});
+					properties.addItem({ui:"button",id:"textAlign",name: "文字对齐", value: button.textAlign});
+					properties.addItem({ui:"button",id:"btnType",name: "按钮类型", value: button.btnType});
+					properties.addItem({ui:"button",id:"customScript",name: "自定义脚本", value: button.customScript});
+				}else if(focusObj is STImage){
+					var sTImage:STImage = focusObj  as STImage;
+					if(sTImage.imageId==null){
+						sTImage.imageId = sTImage.name;
+					}
+					properties.addItem({ui:"image",id:"id",name: "按钮ID", value:sTImage.imageId});
+					properties.addItem({ui:"image",id:"x",name: "X坐标", value: sTImage.x});	
+					properties.addItem({ui:"image",id:"y",name: "Y坐标", value: sTImage.y});	
+					properties.addItem({ui:"image",id:"title",name: "提示", value: sTImage.title});	
+					properties.addItem({ui:"image",id:"width",name: "宽", value: sTImage.width});
+					properties.addItem({ui:"image",id:"height",name: "高", value: sTImage.height});
+					properties.addItem({ui:"image",id:"autoWH",name: "自适应宽高", value: sTImage.autoWH});				
+					properties.addItem({ui:"image",id:"hidden",name: "隐藏", value:sTImage.hidden});
+					properties.addItem({ui:"image",id:"src",name: "地址", value: sTImage.src});
+					properties.addItem({ui:"image",id:"customScript",name: "自定义脚本", value: sTImage.customScript});
+				}else if(focusObj is STCheckBox){
+					var checkBox:STCheckBox = focusObj  as STCheckBox;
+					if(checkBox.checkBoxId==null){
+						checkBox.checkBoxId = checkBox.name;
+					}
+					properties.addItem({ui:"checkBox",id:"id",name: "按钮ID", value:checkBox.checkBoxId});
+					properties.addItem({ui:"checkBox",id:"name",name: "name", value:checkBox.checkBoxName});
+					properties.addItem({ui:"checkBox",id:"x",name: "X坐标", value: checkBox.x});	
+					properties.addItem({ui:"checkBox",id:"y",name: "Y坐标", value: checkBox.y});	
+					properties.addItem({ui:"checkBox",id:"label",name: "Label", value: checkBox.label});	
+					properties.addItem({ui:"checkBox",id:"width",name: "宽", value: checkBox.width});
+					properties.addItem({ui:"checkBox",id:"height",name: "高", value: checkBox.height});			
+					properties.addItem({ui:"checkBox",id:"hidden",name: "隐藏", value:checkBox.hidden});
+					properties.addItem({ui:"checkBox",id:"disabled",name: "不可用", value:checkBox.disabled});
+					properties.addItem({ui:"checkBox",id:"selected",name: "选中", value:checkBox.selected});
+					properties.addItem({ui:"checkBox",id:"readonly",name: "只读", value:checkBox.readonly});
+					properties.addItem({ui:"checkBox",id:"isNeed",name: "必输", value:checkBox.isNeed});
+					properties.addItem({ui:"checkBox",id:"source",name: "数据源", value:checkBox.source});
+					properties.addItem({ui:"checkBox",id:"field",name: "数据源字段", value:checkBox.field});
+					properties.addItem({ui:"checkBox",id:"selectValue",name: "选项定义", value:checkBox.selectValue});
+					properties.addItem({ui:"checkBox",id:"initValue",name: "初始值", value:checkBox.initValue});
+					properties.addItem({ui:"checkBox",id:"dataType",name: "数据类型", value:checkBox.dataType});
+					properties.addItem({ui:"checkBox",id:"dataDisplaySize",name: "长度", value:checkBox.dataDisplaySize});
+					properties.addItem({ui:"checkBox",id:"childPropertie",name: "属性名", value:checkBox.childPropertie});
+					properties.addItem({ui:"checkBox",id:"selectedAllChild",name: "选择所有", value:checkBox.selectedAllChild});
+					properties.addItem({ui:"checkBox",id:"otherChildPropertie",name: "关联属性名", value:checkBox.otherChildPropertie});
+					properties.addItem({ui:"checkBox",id:"customScript",name: "自定义脚本", value: checkBox.customScript});
+				}else if(focusObj is STCombobox){
+					var stcomboBox:STCombobox = focusObj  as STCombobox;
+					if(stcomboBox.comboBoxId==null){
+						stcomboBox.comboBoxId = stcomboBox.name;
+					}
+					properties.addItem({ui:"comboBox",id:"id",name: "下拉ID", value:stcomboBox.comboBoxId});
+					properties.addItem({ui:"comboBox",id:"name",name: "name", value:stcomboBox.comboBoxName});
+					properties.addItem({ui:"comboBox",id:"x",name: "X坐标", value: stcomboBox.x});	
+					properties.addItem({ui:"comboBox",id:"y",name: "Y坐标", value: stcomboBox.y});	
+					properties.addItem({ui:"comboBox",id:"width",name: "宽", value: stcomboBox.width});
+					properties.addItem({ui:"comboBox",id:"height",name: "高", value: stcomboBox.height});			
+					properties.addItem({ui:"comboBox",id:"hidden",name: "隐藏", value:stcomboBox.hidden});
+					properties.addItem({ui:"comboBox",id:"readonly",name: "只读", value:stcomboBox.readonly});
+					properties.addItem({ui:"comboBox",id:"disabled",name: "不可用", value:stcomboBox.disabled});
+					properties.addItem({ui:"comboBox",id:"isNeed",name: "必输", value:stcomboBox.isNeed});
+					properties.addItem({ui:"comboBox",id:"source",name: "数据源", value:stcomboBox.source});
+					properties.addItem({ui:"comboBox",id:"field",name: "数据源字段", value:stcomboBox.field});
+					properties.addItem({ui:"comboBox",id:"selectValue",name: "选项定义", value:stcomboBox.selectValue});
+					properties.addItem({ui:"comboBox",id:"initValue",name: "初始值", value:stcomboBox.initValue});
+					properties.addItem({ui:"comboBox",id:"dataType",name: "数据类型", value:stcomboBox.dataType});
+					properties.addItem({ui:"comboBox",id:"dataDisplaySize",name: "长度", value:stcomboBox.dataDisplaySize});
+					properties.addItem({ui:"comboBox",id:"textAlign",name: "文字对齐", value: stcomboBox.textAlign});
+					properties.addItem({ui:"comboBox",id:"customScript",name: "自定义脚本", value: stcomboBox.customScript});
+				}else if(focusObj is STRadioButton){
+					var stRadioButton:STRadioButton = focusObj  as STRadioButton;
+					if(stRadioButton.radioButtonId==null){
+						stRadioButton.radioButtonId = stRadioButton.name;
+					}
+					properties.addItem({ui:"radioButton",id:"id",name: "下拉ID", value:stRadioButton.radioButtonId});
+					properties.addItem({ui:"radioButton",id:"name",name: "name", value:stRadioButton.radioButtonName});
+					properties.addItem({ui:"radioButton",id:"x",name: "X坐标", value: stRadioButton.x});	
+					properties.addItem({ui:"radioButton",id:"y",name: "Y坐标", value: stRadioButton.y});	
+					properties.addItem({ui:"radioButton",id:"width",name: "宽", value: stRadioButton.width});
+					properties.addItem({ui:"radioButton",id:"height",name: "高", value: stRadioButton.height});			
+					properties.addItem({ui:"radioButton",id:"hidden",name: "隐藏", value:stRadioButton.hidden});
+					properties.addItem({ui:"radioButton",id:"readonly",name: "只读", value:stRadioButton.readonly});
+					properties.addItem({ui:"radioButton",id:"disabled",name: "不可用", value:stRadioButton.disabled});
+					properties.addItem({ui:"radioButton",id:"isNeed",name: "必输", value:stRadioButton.isNeed});
+					properties.addItem({ui:"radioButton",id:"source",name: "数据源", value:stRadioButton.source});
+					properties.addItem({ui:"radioButton",id:"field",name: "数据源字段", value:stRadioButton.field});
+					properties.addItem({ui:"radioButton",id:"selectValue",name: "选项定义", value:stRadioButton.selectValue});
+					properties.addItem({ui:"radioButton",id:"initValue",name: "初始值", value:stRadioButton.initValue});
+					properties.addItem({ui:"radioButton",id:"dataType",name: "数据类型", value:stRadioButton.dataType});
+					properties.addItem({ui:"radioButton",id:"dataDisplaySize",name: "长度", value:stRadioButton.dataDisplaySize});
+					//properties.addItem({ui:"radioButton",id:"textAlign",name: "文字对齐", value: stRadioButton.textAlign});
+					properties.addItem({ui:"radioButton",id:"customScript",name: "自定义脚本", value: stRadioButton.customScript});
+				}
+				
+			}
+			public function setPropertie(propertie:String,value:String):void{
+				for(var i=0;i<properties.length;i++){
+					if(properties[i].id==propertie){
+						properties[i].value=value;
+						break;
+					}
+				}
+			}
+			public function getPropertie(propertie:String):String{
+				for(var i=0;i<properties.length;i++){
+					if(properties[i].id==propertie){
+						return properties[i].value;
+						break;
+					}
+				}
+				return null;
+			}
+			/**
+			 * 数据编辑完成 所有
+			 * */
+			public function onGridEditByProperties(){
+				for(var i=0;i<properties.length;i++){
+					this.onGridEdit(properties[i]);
+				}
+			}
+			/**
+			 * 数据编辑完成
+			 * */
+			public function onGridEdit(obj:Object):void{
+				
+				var id:String =obj.id;
+				if(focusObj is Table){
+					var table:Table = focusObj as Table;
+					table.setPropertie(obj);
+				}else
+					if(focusObj is InputLabel){
+						var inputLabel:InputLabel = focusObj  as InputLabel;
+						inputLabel.setPropertie(obj);
+						
+					}else
+						if(focusObj is InputField){
+							var inputField:InputField = focusObj  as InputField;
+							inputField.setPropertie(obj);
+							
+						}else if(focusObj is components.TextArea){
+							var textArea:components.TextArea = focusObj  as components.TextArea;
+							textArea.setPropertie(obj);
+							
+						}else if(focusObj is STButton){
+							var button:STButton = focusObj  as STButton;
+							button.setPropertie(obj);
+							
+						}else if(focusObj is STImage){
+							var sTImage:STImage = focusObj  as STImage;
+							sTImage.setPropertie(obj);
+							
+						}else if(focusObj is STCheckBox){
+							var stCheckBox:STCheckBox = focusObj  as STCheckBox;
+							stCheckBox.setPropertie(obj);
+							
+						}else if(focusObj is STCombobox){
+							var stcomboBox:STCombobox = focusObj  as STCombobox;
+							stcomboBox.setPropertie(obj);
+							
+						}else if(focusObj is STRadioButton){
+							var stTRadioButton:STRadioButton = focusObj  as STRadioButton;
+							stTRadioButton.setPropertie(obj);
+							
+						}
+			}
+			/**
+			 * 数据网格编辑完成
+			 */
+			internal function onGridEditEnd(event: DataGridEvent): void{
+				return;
+				var tf: TextInput = TextInput(dgProp.itemEditorInstance);
+				var value: String = tf.text;
+				//event.rowIndex
+				properties.getItemAt(event.rowIndex).value=value;
+				var id:String =properties.getItemAt(event.rowIndex).id;
+				
+				if((id=="hidden" || id=="disabled" || id=="readonly") && value!="true"){
+					properties.getItemAt(event.rowIndex).value="false";
+					tf.text = "false";
+				}
+				if(focusObj is Table){
+					var table:Table = focusObj as Table;
+					table.setPropertie(properties.getItemAt(event.rowIndex));
+				}else
+				if(focusObj is InputLabel){
+					var inputLabel:InputLabel = focusObj  as InputLabel;
+					inputLabel.setPropertie(properties.getItemAt(event.rowIndex));
+					
+				}else
+				if(focusObj is InputField){
+					var inputField:InputField = focusObj  as InputField;
+					inputField.setPropertie(properties.getItemAt(event.rowIndex));
+					
+				}else if(focusObj is components.TextArea){
+					var textArea:components.TextArea = focusObj  as components.TextArea;
+					textArea.setPropertie(properties.getItemAt(event.rowIndex));
+					
+				}else if(focusObj is STButton){
+					var button:STButton = focusObj  as STButton;
+					button.setPropertie(properties.getItemAt(event.rowIndex));
+					
+				}else if(focusObj is STImage){
+					var sTImage:STImage = focusObj  as STImage;
+					sTImage.setPropertie(properties.getItemAt(event.rowIndex));
+					
+				}else if(focusObj is STCheckBox){
+					var stCheckBox:STCheckBox = focusObj  as STCheckBox;
+					stCheckBox.setPropertie(properties.getItemAt(event.rowIndex));
+					
+				}else if(focusObj is STCombobox){
+					var stcomboBox:STCombobox = focusObj  as STCombobox;
+					stcomboBox.setPropertie(properties.getItemAt(event.rowIndex));
+					
+				}else if(focusObj is STRadioButton){
+					var stRadioButton:STRadioButton = focusObj  as STRadioButton;
+					stRadioButton.setPropertie(properties.getItemAt(event.rowIndex));
+					
+				}
+			}
+			//初始化组件对象
+			private function setIcons2Object():void{
+				for(var i:int=0;i<icons.dataProvider.length;i++){
+					var obj:Object=new Object();
+					icons.dataProvider[i].index=i;
+					iconsObject[icons.dataProvider[i].iconName] = icons.dataProvider[i];
+				}
+			}
+			private function appDataSourceSubWindow(event:MouseEvent):void
+			{ 
+				var dsa:DataSourceAdd = new DataSourceAdd();
+				PopUpManager.addPopUp(dsa, hdbox, true); 
+				PopUpManager.centerPopUp(dsa); 
+				//PopUpManager.createPopUp(htmlDesign,DataSourceAdd,true);
+			}
+			public function getDataSourceTree(event:MouseEvent=null):void{
+				this.addLoading();
+				dataSourceTreeXML.url = config.webURL+"/SQLDataSourceTreeXML";
+				var params:Object = new Object();
+				params["time"] = new Date().date;
+				params["dataSourceXML"] = this.getDataSourceArr2XML(dataSourceArr);
+				dataSourceTreeXML.method="POST";
+				dataSourceTreeXML.send(params);
+			} 
+			/**
+			 * 数据源从数组转成xml
+			 * */
+			public function getDataSourceArr2XML(dataSourceArr:Array):XML{
+				var dataSourceXML:String="<data>";
+				for(var i:int=0;i<dataSourceArr.length;i++){
+					var obj:Object = dataSourceArr[i] as Object;
+					var stateName:String;
+					if(obj["state"]=="tableState"){
+						stateName = "表";
+					}else if(obj["state"]=="viewState"){
+						stateName = "视图";
+					}else if(obj["state"]=="sqlState"){
+						stateName = "自定义SQL";
+					}
+					dataSourceXML+="<datasource main='"+obj["main"]+"' mainName='"+(obj["main"]=="1"?"是":"")+"'><name>"+obj["name"]+"</name><database>"+obj["database"]+"</database><databaseName>"+obj["databaseName"]+"</databaseName><state>"+obj["state"]+"</state><stateName>"+stateName+"</stateName><sqlvalue>"+obj["sqlvalue"]+"</sqlvalue></datasource>";
+				}
+				dataSourceXML+="</data>";
+				return XML(dataSourceXML);
+			}
+			private function onJSONLoad(event:ResultEvent):void  
+			{   
+				
+				try{
+					treeXmlData=new XMLListCollection(new XML(event.result).datasource);
+					dataSourceTree.dataProvider = treeXmlData;
+					dataSourceTree.labelField="@name"
+					if(this.viewManager!=null){
+						try{
+							this.viewManager.removeListExist();
+						}catch(e:*){
+							
+						}
+					}
+				}catch(e:*){
+					
+					Alert.show("系统错误");
+				}				
+				this.removeLoading();
+			}  
+			protected function service_faultHandler(event:FaultEvent):void
+			{
+				Alert.show("Web连接出错!");
+				this.removeLoading();
+			}
+
+			private function dataSourceArr2XML():XML{
+				var str:String = "<data>";
+				for(var i:int=0;i<dataSourceArr.length;i++){
+					var obj:Object = dataSourceArr[i];
+					str+="<datasource "+(obj["main"]=="1"?"main='1'":"")+"  >";
+					str+="<name>"+obj["name"]+"</name>" +
+						"<database>"+obj["database"]+"</database>" +
+						"<databaseName>"+obj["databaseName"]+"</databaseName>" +
+						"<state>"+obj["state"]+"</state>" +
+						"<sqlvalue>"+obj["sqlvalue"]+"</sqlvalue>";
+					str+="<params>";
+					for(var n:int=0;n<obj["params"].length;n++){
+						str+="<param field='"+obj["params"][n].field+"' condition='"+obj["params"][n].condition+"'>"+obj["params"][n].value+"</param>";
+					}
+					str+="</params>";
+					
+					var bind:ArrayCollection = dataSourceArr[i]["bind"] as ArrayCollection;
+					if(bind!=null && bind.length>0){
+						str+="<bind mainDatasourcename='"+bind[0].mainDatasourcename+"' followDatasourcename='"+bind[0].followDatasourcename+"'>";
+						for(var n:int=0;n<bind.length;n++){
+							str+="<field mainField='"+bind[n].mainField+"' followField='"+bind[n].followField+"'/>";
+						}
+						str+="</bind>";	
+					}
+					
+					str+="</datasource>";
+				}				
+					
+				str+="</data>"
+				return XML(str);
+			}
+			protected function viewstack1_changeHandler(event:IndexChangedEvent):void
+			{	try{
+					if(xmlTextArea!=null && xmlTextArea.text!=""){		
+						
+						if(xmlTextArea_changeFlag==true){
+							var sformdatasourceXML:XML = XML(XML(xmlTextArea.text).child("sformdatasource").text().toString());
+							this.xml2DataSourceArr(sformdatasourceXML);
+							//Alert.show(XML(xmlTextArea.text).child("viewField").text().toString().replace("START_CDATA", "<!\[CDATA\[").replace("END_CDATA", "\]\]>"));
+							viewFieldXML = XML(xmlTextArea.text).child("viewField").text().toString();
+						}
+							
+						if(viewstack1.selectedIndex==3){
+							viewManager.formDesign = this;
+							if(viewManager.dataSource.dataProvider==null || viewManager.dataSource.dataProvider.length==0){
+								viewManager.initData();
+							}
+							
+							if(this.viewManager!=null){
+								if(viewFieldXML!=null &&　viewFieldXML!=""){
+									this.viewManager.xml2list(XML(viewFieldXML.replace("START_CDATA", "<!\[CDATA\[").replace("END_CDATA", "\]\]>")));
+								}
+							}
+							
+						}
+					}
+					if(xmlTextArea_changeFlag==true && viewstack1.selectedIndex!=1){
+						if(xmlTextArea.text!=""){
+							this.toDesign();
+						}
+						xmlTextArea_changeFlag=false;
+					} 
+					if(viewstack1.selectedIndex==1){
+						
+						xmlTextArea.text = XML(this.toXML());
+						xmlTextArea.setFocus();
+					}else if(viewstack1.selectedIndex==2){
+						
+						if(customSourceTextArea.text==""){
+							var customSource:String = "\n";
+							customSource +="<%!\n"; 								
+							customSource +="	/**表单相关事件 - 不可修改名称与参数\n"; 	
+							customSource +="	 * 页面加载前事件\n"; 	
+							customSource +="	 * @author chen\n"; 	
+							customSource +="	 */\n"; 	
+							customSource +="	public void onBeginPageLoad(HttpServletRequest request,HttpServletResponse response,Map<String,Object[]> parameterMap,Map<String,SFormJdbc> baseJdbcMap) throws Exception\n"; 	
+							customSource +="	{\n"; 	
+							customSource +="		\n"; 	
+							customSource +="	}\n"; 	
+							customSource +="\n"; 	
+							customSource +="\n"; 	
+							customSource +="	/**表单相关事件 - 不可修改名称与参数\n"; 	
+							customSource +="	 * 页面加载后事件\n"; 	
+							customSource +="	 * @author chen\n"; 	
+							customSource +="	 */\n"; 	
+							customSource +="	public void onAfterPageLoad(HttpServletRequest request,HttpServletResponse response,Map<String,Object[]> parameterMap,Map<String,SFormJdbc> baseJdbcMap) throws Exception\n"; 	
+							customSource +="	{\n"; 	
+							customSource +="		\n"; 	
+							customSource +="	}			\n"; 					
+							customSource +="\n"; 	
+							customSource +="	/**表单相关事件 - 不可修改名称与参数\n"; 	
+							customSource +="	 * 保存前事件\n"; 	
+							customSource +="	 * @author chen\n"; 	
+							customSource +="	 */\n"; 	
+							customSource +="	public void onBeginSave(HttpServletRequest request,HttpServletResponse response,Map<String,Object[]> parameterMap,Map<String,SFormJdbc> baseJdbcMap) throws Exception\n"; 	
+							customSource +="	{	\n"; 	
+							customSource +="		\n"; 	
+							customSource +="	}		\n"; 						
+							customSource +="\n"; 	
+							customSource +="	/**表单相关事件 - 不可修改名称与参数\n"; 	
+							customSource +="	 * 保存后事件\n"; 	
+							customSource +="	 * @author chen\n"; 	
+							customSource +="	 */\n"; 	
+							customSource +="	public void onAfterSave(HttpServletRequest request,HttpServletResponse response,Map<String,Object[]> parameterMap,Map<String,SFormJdbc> baseJdbcMap) throws Exception\n"; 	
+							customSource +="	{\n"; 	
+							customSource +="		\n"; 	
+							customSource +="	}\n"; 	
+							customSource +="\n"; 	
+							customSource +="%>\n"; 
+							customSourceTextArea.text = customSource;
+						}
+						if(ListCustomSourceTextArea.text==""){
+							var customSource:String = "\n";
+							customSource +="<%!\n"; 								
+							customSource +="	/**表单相关事件 - 不可修改名称与参数\n"; 	
+							customSource +="	 * 页面加载前事件\n"; 	
+							customSource +="	 * @author chen\n"; 	
+							customSource +="	 */\n"; 	
+							customSource +="	public void onBeginPageLoad(HttpServletRequest request,HttpServletResponse response,Map<String,Object[]> parameterMap,Map<String,SFormJdbc> baseJdbcMap) throws Exception\n"; 	
+							customSource +="	{\n"; 	
+							customSource +="		\n"; 	
+							customSource +="	}\n"; 	
+							customSource +="\n"; 	
+							customSource +="\n"; 	
+							customSource +="	/**表单相关事件 - 不可修改名称与参数\n"; 	
+							customSource +="	 * 页面加载后事件\n"; 	
+							customSource +="	 * @author chen\n"; 	
+							customSource +="	 */\n"; 	
+							customSource +="	public void onAfterPageLoad(HttpServletRequest request,HttpServletResponse response,Map<String,Object[]> parameterMap,Map<String,SFormJdbc> baseJdbcMap) throws Exception\n"; 	
+							customSource +="	{\n"; 	
+							customSource +="		\n"; 	
+							customSource +="	}			\n"; 					
+							customSource +="\n"; 	
+							customSource +="	/**表单相关事件 - 不可修改名称与参数\n"; 	
+							customSource +="	 * 删除前事件\n"; 	
+							customSource +="	 * @author chen\n"; 	
+							customSource +="	 */\n"; 	
+							customSource +="	public void onBeginDelete(HttpServletRequest request,HttpServletResponse response,Map<String,Object[]> parameterMap,Map<String,SFormJdbc> baseJdbcMap) throws Exception\n"; 	
+							customSource +="	{	\n"; 	
+							customSource +="		\n"; 	
+							customSource +="	}		\n"; 						
+							customSource +="\n"; 	
+							customSource +="	/**表单相关事件 - 不可修改名称与参数\n"; 	
+							customSource +="	 * 删除后事件\n"; 	
+							customSource +="	 * @author chen\n"; 	
+							customSource +="	 */\n"; 	
+							customSource +="	public void onAfterDelete(HttpServletRequest request,HttpServletResponse response,Map<String,Object[]> parameterMap,Map<String,SFormJdbc> baseJdbcMap) throws Exception\n"; 	
+							customSource +="	{\n"; 	
+							customSource +="		\n"; 	
+							customSource +="	}\n"; 	
+							customSource +="\n"; 	
+							customSource +="%>\n"; 
+							ListCustomSourceTextArea.text = customSource;
+						}
+					}
+					
+				}catch(e:*){
+					throw e;
+					Alert.show("解析错误，请检查XML！")
+				}
+			}
+			private function toDesign():void{
+				
+				changeLogFlag=true;
+				htmlDesign.removeAllChildren();
+				if(xmlTextArea.text!=""){
+					versionText.text = XML(xmlTextArea.text).child("version").text();
+					workflowid.selectedIndex=0;
+					for(var i:int=0;i<workflowArr.length;i++){
+						if(workflowArr.getItemAt(i).data== XML(xmlTextArea.text).child("workflowid").text()){
+							workflowid.selectedItem = workflowArr.getItemAt(i);
+							break;
+						}
+					}
+					widthText.text = XML(xmlTextArea.text).child("width").text();
+					heightText.text = XML(xmlTextArea.text).child("height").text();
+					customSourceTextArea.text = XML(xmlTextArea.text).child("customSource").text();
+					ListCustomSourceTextArea.text = XML(xmlTextArea.text).child("ListCustomSource").text();
+					var xmlDesign:XML =XML(XML(xmlTextArea.text).child("design"));
+					//this.xml2DataSourceArr(sformdatasourceXML);
+					this.xml2design(htmlDesign,xmlDesign);
+				}
+				
+				focusObj = null;
+			}
+			private function toXML():String{
+				var xmlStr:String="<data>";
+				xmlStr+="<version>"+versionText.text+"</version>"
+				xmlStr+="<workflowid>"+(workflowid.selectedItem!=null?workflowid.selectedItem.data:"")+"</workflowid>"
+				xmlStr+="<width>"+widthText.text+"</width>"
+				xmlStr+="<height>"+heightText.text+"</height>"
+				xmlStr+="<sformdatasource>\n<!\[CDATA[";
+				xmlStr+=this.dataSourceArr2XML();
+				xmlStr+="\]\]>\n</sformdatasource>";
+				xmlStr+="<customSource>\n<!\[CDATA[";
+				xmlStr+=this.customSourceTextArea.text;
+				xmlStr+="\]\]>\n</customSource>";
+				xmlStr+="<ListCustomSource>\n<!\[CDATA[";
+				xmlStr+=this.ListCustomSourceTextArea.text;
+				xmlStr+="\]\]>\n</ListCustomSource>";
+				xmlStr+="<viewField>\n<!\[CDATA[";
+				if(this.viewManager!=null){
+					try{
+						viewFieldXML = this.viewManager.getXMLStr();
+					}catch(e:*){		
+						//	throw e;
+					}
+				}						
+				xmlStr+=viewFieldXML;
+				xmlStr+="\]\]>\n</viewField>";
+				xmlStr+="<design>";
+				xmlStr+= this.design2xml(htmlDesign);
+				xmlStr+="</design>";
+				xmlStr+="</data>";
+				return xmlStr;
+			}
+			//xml转DataSourceArr
+			private function xml2DataSourceArr(xml:XML):void{
+				var dataSourceArr:Array = new Array();
+				var datasourceXMLList:XMLList = xml.children();
+				for(var i:int=0;i<datasourceXMLList.length();i++){
+					var datasourceXML:XML = datasourceXMLList[i];
+					var obj:Object = new Object();
+					obj["name"] = datasourceXML.child("name");
+					obj["database"] = datasourceXML.child("database");
+					obj["databaseName"] =datasourceXML.child("databaseName");
+					obj["state"] = datasourceXML.child("state");
+					obj["sqlvalue"] = datasourceXML.child("sqlvalue");
+					
+					var paramsXMLList:XMLList = datasourceXML.child("params").children();
+					var params:ArrayCollection = new ArrayCollection();
+					for(var n:int=0;n<paramsXMLList.length();n++){
+						var paramsXML:XML = paramsXMLList[n];
+						params.addItem({value:paramsXML.text(),field:paramsXML.@field,condition:paramsXML.@condition})
+					}
+					obj["params"] =params;
+					
+					if(datasourceXML.child("main")!=null){
+						obj["main"] = datasourceXML.attribute("main")
+					}
+					var bindXMLList:XMLList = datasourceXML.child("bind").children();
+					var bindData:ArrayCollection = new ArrayCollection();
+					for(var n:int=0;n<bindXMLList.length();n++){
+						var bindXML:XML = bindXMLList[n];
+						bindData.addItem({mainDatasourcename:datasourceXML.child("bind").attribute("mainDatasourcename"),
+							mainField:bindXML.attribute("mainField"),
+							followDatasourcename:datasourceXML.child("bind").attribute("followDatasourcename"),
+							followField:bindXML.attribute("followField")});
+						
+					}
+					obj["bind"] = bindData;
+					dataSourceArr[dataSourceArr.length] = obj;
+				}
+				this.dataSourceArr = dataSourceArr;
+				this.getDataSourceTree();
+			}
+			//xml转disign
+			private function xml2design(displayObject:DisplayObject,xml:XML):void{
+				var chidren:XMLList=xml.children();
+				var ui:UIComponent = displayObject as UIComponent;
+				for(var i:int=0;i<chidren.length();i++){
+					var uiXml:XML =chidren[i];
+					if(uiXml.@name=="table"){
+						var table:Table = new Table(0,0);
+						table.tableId = uiXml.id;
+						//table.width = uiXml.width;
+						//table.height = uiXml.height;
+						table.x = uiXml.x;
+						table.y = uiXml.y;
+						if(uiXml.isDataGrid=="true"){
+							table.isDataGrid = true;
+						}
+						table.source = uiXml.source;
+						ui.addChild(table);
+						if(uiXml.ui!=null){
+							this.xml2design(table,XML("<design>"+uiXml.ui+"</design>"));
+						}
+					}else if(uiXml.@name=="tr"){
+						var table:Table = displayObject as Table;	
+						var tr:Tr = new Tr();
+						tr.trId = uiXml.id;
+						//tr.width = uiXml.width;
+						tr.height = uiXml.height;
+						if(uiXml.isDataGridDetail=="true"){
+							tr.isDataGridDetail=true;
+						}
+						table.rows = table.rows+1;
+						table.addChild(tr);
+						if(uiXml.ui!=null){
+							this.xml2design(tr,XML("<design>"+uiXml.ui+"</design>"));
+						}
+					}else if(uiXml.@name=="td"){
+						var table:Table = displayObject.parent as Table;			
+						var tr:Tr = displayObject as Tr;						
+						var td:Td =tr.addTd();
+						td.tdId = uiXml.id;
+						td.width = uiXml.width;
+						//td.height = uiXml.height;
+						td.colSpan = uiXml.colSpan;
+						td.rowSpan = uiXml.rowSpan;
+						td.backgroundColor = uiXml.backgroundColor;
+						table.tdEvent(td);
+						if(uiXml.ui!=null){
+							this.xml2design(td.canvas,XML("<design>"+uiXml.ui+"</design>"));
+						}
+					}else if(uiXml.@name=="inputfield"){
+						var inputfield:InputField = new InputField();
+						inputfield.inputFieldId = uiXml.id;
+						inputfield.width = uiXml.width;
+						inputfield.height = uiXml.height;
+						inputfield.text = uiXml.text;
+						inputfield.readonly = uiXml.readonly=="true"?true:false;
+						inputfield.disabled = uiXml.disabled=="true"?true:false;
+						inputfield.hidden = uiXml.hidden=="true"?true:false;
+						inputfield.x = uiXml.x;
+						inputfield.y = uiXml.y;
+						inputfield.inputFieldName = uiXml.name;
+						inputfield.source = uiXml.source;
+						inputfield.field = uiXml.field;
+						inputfield.initValue = uiXml.initValue;
+						inputfield.isType = uiXml.isType;
+						inputfield.dataType = uiXml.dataType;
+						inputfield.dataDisplaySize = uiXml.dataDisplaySize;
+						inputfield.textAlign = uiXml.textAlign;
+						inputfield.customScript = uiXml.customScript;
+						inputfield.isNeed = uiXml.isNeed;
+						inputfield.contentBackgroundColor = uiXml.backgroundColor;
+						inputfield.fontColor = uiXml.fontColor;
+						inputfield.comboGridIni = uiXml.comboGridIni;
+						
+						ui.addChild(inputfield);
+					}else if(uiXml.@name=="inputlabel"){
+						var inputlabel:InputLabel = new InputLabel();
+						inputlabel.inputLabelId = uiXml.id;
+						inputlabel.width = uiXml.width;
+						inputlabel.textArea.text = uiXml.text;
+						inputlabel.height= uiXml.height;
+						inputlabel.x = uiXml.x;
+						inputlabel.y = uiXml.y;
+						inputlabel.textAlign = uiXml.textAlign;
+						inputlabel.contentBackgroundColor = uiXml.backgroundColor;
+						inputlabel.fontColor = uiXml.fontColor;
+						ui.addChild(inputlabel);
+					}else if(uiXml.@name=="textarea"){
+						var textarea:components.TextArea = new components.TextArea();
+						textarea.textAreaId = uiXml.id;
+						textarea.width = uiXml.width;
+						textarea.height = uiXml.height;
+						textarea.text = uiXml.text;
+						textarea.readonly = uiXml.readonly=="true"?true:false;
+						textarea.disabled = uiXml.disabled=="true"?true:false;
+						textarea.hidden = uiXml.hidden=="true"?true:false;
+						textarea.x = uiXml.x;
+						textarea.y = uiXml.y;
+						textarea.textAreaName = uiXml.name;
+						textarea.source = uiXml.source;
+						textarea.field = uiXml.field;
+						textarea.initValue = uiXml.initValue;
+						textarea.dataType = uiXml.dataType;
+						textarea.dataDisplaySize = uiXml.dataDisplaySize;
+						textarea.textAlign = uiXml.textAlign;
+						textarea.customScript = uiXml.customScript;
+						textarea.isNeed = uiXml.isNeed;
+						textarea.contentBackgroundColor = uiXml.backgroundColor;
+						textarea.fontColor = uiXml.fontColor;
+						ui.addChild(textarea);
+					}else if(uiXml.@name=="button"){
+						var button:STButton = new STButton();
+						button.buttonId = uiXml.id;
+						button.width = uiXml.width;
+						button.height = uiXml.height;
+						button.label = uiXml.label;
+						button.disabled = uiXml.disabled=="true"?true:false;
+						button.hidden = uiXml.hidden=="true"?true:false;
+						button.x = uiXml.x;
+						button.y = uiXml.y;
+						button.textAlign = uiXml.textAlign;
+						button.btnType = uiXml.btnType;
+						button.customScript = uiXml.customScript;
+						button.chromeColor = uiXml.backgroundColor;
+						button.fontColor = uiXml.fontColor;
+						ui.addChild(button);
+					}else if(uiXml.@name=="image"){
+						var image:STImage = new STImage();
+						image.imageId = uiXml.id;
+						image.width = uiXml.width;
+						image.height = uiXml.height;
+						image.title = uiXml.title;
+						image.hidden = uiXml.hidden=="true"?true:false;
+						image.x = uiXml.x;
+						image.y = uiXml.y;
+						image.src = uiXml.src;
+						image.autoWH = uiXml.autoWH;
+						image.customScript = uiXml.customScript;
+						ui.addChild(image);
+					}else if(uiXml.@name=="checkBox"){
+						var stCheckBox:STCheckBox = new STCheckBox();
+						stCheckBox.checkBoxId = uiXml.id;
+						stCheckBox.width = uiXml.width;
+						stCheckBox.height = uiXml.height;
+						stCheckBox.label = uiXml.label;
+						stCheckBox.disabled = uiXml.disabled=="true"?true:false;
+						stCheckBox.hidden = uiXml.hidden=="true"?true:false;
+						stCheckBox.x = uiXml.x;
+						stCheckBox.y = uiXml.y;
+						stCheckBox.selectedAllChild = uiXml.selectedAllChild=="true"?true:false;
+						stCheckBox.childPropertie = uiXml.childPropertie;
+						stCheckBox.otherChildPropertie = uiXml.otherChildPropertie;
+						
+						
+						stCheckBox.readonly = uiXml.readonly=="true"?true:false;
+						stCheckBox.checkBoxName = uiXml.name;
+						stCheckBox.source = uiXml.source;
+						stCheckBox.field = uiXml.field;
+						stCheckBox.selectValue = uiXml.selectValue;
+						stCheckBox.dataType = uiXml.dataType;
+						stCheckBox.dataDisplaySize = uiXml.dataDisplaySize;
+						stCheckBox.customScript = uiXml.customScript;
+						stCheckBox.initValue = uiXml.initValue;
+						stCheckBox.isNeed = uiXml.isNeed;
+						stCheckBox.chromeColor = uiXml.backgroundColor;
+						stCheckBox.fontColor = uiXml.fontColor;
+						
+						ui.addChild(stCheckBox);
+					}else if(uiXml.@name=="comboBox"){
+						var stcomboBox:STCombobox = new STCombobox();
+						stcomboBox.comboBoxId = uiXml.id;
+						stcomboBox.width = uiXml.width;
+						stcomboBox.height = uiXml.height;
+						stcomboBox.disabled = uiXml.disabled=="true"?true:false;
+						stcomboBox.hidden = uiXml.hidden=="true"?true:false;
+						stcomboBox.x = uiXml.x;
+						stcomboBox.y = uiXml.y;
+						stcomboBox.readonly = uiXml.readonly=="true"?true:false;
+						stcomboBox.comboBoxName = uiXml.name;
+						stcomboBox.source = uiXml.source;
+						stcomboBox.field = uiXml.field;
+						stcomboBox.initValue = uiXml.initValue;
+						stcomboBox.selectValue = uiXml.selectValue;
+						stcomboBox.dataType = uiXml.dataType;
+						stcomboBox.width = uiXml.width;
+						stcomboBox.dataDisplaySize = uiXml.dataDisplaySize;
+						stcomboBox.customScript = uiXml.customScript;
+						stcomboBox.isNeed = uiXml.isNeed;
+						stcomboBox.chromeColor = uiXml.backgroundColor;
+						stcomboBox.fontColor = uiXml.fontColor;
+						ui.addChild(stcomboBox);
+					}else if(uiXml.@name=="radioButton"){
+						var stRadioButton:STRadioButton = new STRadioButton();
+						stRadioButton.radioButtonId = uiXml.id;
+						stRadioButton.width = uiXml.width;
+						stRadioButton.height = uiXml.height;
+						stRadioButton.disabled = uiXml.disabled=="true"?true:false;
+						stRadioButton.hidden = uiXml.hidden=="true"?true:false;
+						stRadioButton.x = uiXml.x;
+						stRadioButton.y = uiXml.y;
+						stRadioButton.readonly = uiXml.readonly=="true"?true:false;
+						stRadioButton.radioButtonName = uiXml.name;
+						stRadioButton.source = uiXml.source;
+						stRadioButton.field = uiXml.field;
+						stRadioButton.initValue = uiXml.initValue;
+						stRadioButton.selectValue = uiXml.selectValue;
+						stRadioButton.dataType = uiXml.dataType;
+						stRadioButton.width = uiXml.width;
+						stRadioButton.dataDisplaySize = uiXml.dataDisplaySize;
+						stRadioButton.customScript = uiXml.customScript;
+						stRadioButton.isNeed = uiXml.isNeed;
+						if(uiXml.backgroundColor!=null && uiXml.backgroundColor !=undefined && uiXml.backgroundColor!=""){
+							stRadioButton.chromeColor = uiXml.backgroundColor;
+						}
+						if(uiXml.fontColor!=null && uiXml.fontColor !=undefined && uiXml.fontColor!=""){
+							stRadioButton.fontColor = uiXml.fontColor;
+						}
+						ui.addChild(stRadioButton);
+					}
+				}
+			}
+			//转成xml
+			private function design2xml(displayObject:DisplayObject):String{
+				var xmlStr :String="";
+				var ui:UIComponent = displayObject as UIComponent;
+				if(ui.numChildren==0){
+					return "";
+				}
+				for(var i:int=0;i<ui.numChildren;i++){
+					var t_do:DisplayObject = ui.getChildAt(i);
+					if(t_do is Table){
+						var table:Table = t_do as Table;
+						xmlStr += "<ui name='table'>";
+						xmlStr += "<id>"+table.tableId+"</id>";
+						xmlStr += "<width>"+table.width+"</width>";
+						xmlStr += "<height>"+table.height+"</height>";
+						xmlStr += "<x>"+table.x+"</x>";
+						xmlStr += "<y>"+table.y+"</y>";
+						xmlStr += "<isDataGrid>"+table.isDataGrid+"</isDataGrid>";
+						xmlStr += "<source>"+table.source+"</source>";
+						for(var n:int=0;n<table.getChildren().length;n++){
+							var tr:Tr = table.getChildAt(n) as Tr;
+							xmlStr += "<ui name='tr'>";
+							if(tr.isDataGridDetail==true){
+								xmlStr += "<isDataGridDetail>"+tr.isDataGridDetail+"</isDataGridDetail>";
+							}
+							xmlStr += "<id>"+tr.trId+"</id>";
+							//xmlStr += "<width>"+tr.width+"</width>";
+							xmlStr += "<height>"+tr.height+"</height>";
+							for(var k:int=0;k<tr.numChildren;k++){
+								var td:Td = tr.getChildAt(k) as Td;
+								xmlStr += "<ui name='td'>";
+								xmlStr += "<id>"+td.tdId+"</id>";
+								xmlStr += "<width>"+td.width+"</width>";
+								//xmlStr += "<height>"+td.height+"</height>";
+								xmlStr += "<backgroundColor>"+td.backgroundColor+"</backgroundColor>";
+								
+								xmlStr += "<colSpan>"+td.colSpan+"</colSpan>";
+								xmlStr += "<rowSpan>"+td.rowSpan+"</rowSpan>";
+								var canvas:Canvas = td.getChildAt(0) as Canvas;	
+								xmlStr+=this.design2xml(canvas);
+								xmlStr += "</ui>";
+							}
+							xmlStr += "</ui>";
+						}
+						xmlStr += "</ui>";
+					}else if(t_do is InputField){
+						var inputField:InputField = t_do as InputField;
+						xmlStr += "<ui name='inputfield'>";
+						xmlStr += "<id>"+inputField.inputFieldId+"</id>";
+						xmlStr += "<width>"+inputField.width+"</width>";
+						xmlStr += "<height>"+inputField.height+"</height>";
+						xmlStr += "<text><!\[CDATA["+inputField.text+"\]\]></text>";
+						xmlStr += "<readonly>"+inputField.readonly+"</readonly>";
+						xmlStr += "<disabled>"+inputField.disabled+"</disabled>";
+						xmlStr += "<hidden>"+inputField.hidden+"</hidden>";
+						xmlStr += "<isNeed>"+inputField.isNeed+"</isNeed>";
+						xmlStr += "<x>"+inputField.x+"</x>";
+						xmlStr += "<y>"+inputField.y+"</y>";
+						xmlStr += "<name>"+inputField.inputFieldName+"</name>";
+						xmlStr += "<source>"+inputField.source+"</source>";
+						xmlStr += "<field>"+inputField.field+"</field>";
+						xmlStr += "<initValue><!\[CDATA["+inputField.initValue+"\]\]></initValue>";
+						xmlStr += "<dataType>"+inputField.dataType+"</dataType>";
+						xmlStr += "<isType>"+inputField.isType+"</isType>";
+						xmlStr += "<dataDisplaySize>"+inputField.dataDisplaySize+"</dataDisplaySize>";
+						xmlStr += "<textAlign>"+(inputField.textAlign==null?"":inputField.textAlign)+"</textAlign>";
+						xmlStr += "<customScript><!\[CDATA["+(inputField.customScript==null?"":inputField.customScript)+"\]\]></customScript>";
+						xmlStr += "<backgroundColor>"+inputField.contentBackgroundColor+"</backgroundColor>";
+						xmlStr += "<fontColor>"+inputField.fontColor+"</fontColor>";
+						xmlStr += "<comboGridIni><!\[CDATA["+inputField.comboGridIni+"\]\]></comboGridIni>";
+						
+						
+						xmlStr += "</ui>";
+						
+					}else if(t_do is InputLabel){
+						var inputLabel:InputLabel = t_do as InputLabel;
+						xmlStr += "<ui name='inputlabel'>";
+						xmlStr += "<id>"+inputLabel.inputLabelId+"</id>";
+						xmlStr += "<width>"+inputLabel.width+"</width>";
+						xmlStr += "<height>"+inputLabel.height+"</height>";
+						xmlStr += "<text><!\[CDATA["+inputLabel.textArea.text+"\]\]></text>";
+						xmlStr += "<x>"+inputLabel.x+"</x>";
+						xmlStr += "<y>"+inputLabel.y+"</y>";
+						xmlStr += "<textAlign>"+(inputLabel.textAlign==null?"":inputLabel.textAlign)+"</textAlign>";
+						xmlStr += "<backgroundColor>"+inputLabel.contentBackgroundColor+"</backgroundColor>";
+						xmlStr += "<fontColor>"+inputLabel.fontColor+"</fontColor>";
+						xmlStr += "</ui>";
+						
+					}else if(t_do is components.TextArea){
+						var textArea:components.TextArea = t_do as components.TextArea;
+						xmlStr += "<ui name='textarea'>";
+						xmlStr += "<id>"+textArea.textAreaId+"</id>";
+						xmlStr += "<width>"+textArea.width+"</width>";
+						xmlStr += "<height>"+textArea.height+"</height>";
+						xmlStr += "<text><!\[CDATA["+textArea.text+"\]\]></text>";
+						xmlStr += "<readonly>"+textArea.readonly+"</readonly>";
+						xmlStr += "<disabled>"+textArea.disabled+"</disabled>";
+						xmlStr += "<hidden>"+textArea.hidden+"</hidden>";
+						xmlStr += "<isNeed>"+textArea.isNeed+"</isNeed>";
+						xmlStr += "<x>"+textArea.x+"</x>";
+						xmlStr += "<y>"+textArea.y+"</y>";
+						xmlStr += "<name>"+textArea.textAreaName+"</name>";
+						xmlStr += "<source>"+textArea.source+"</source>";
+						xmlStr += "<field>"+textArea.field+"</field>";
+						xmlStr += "<initValue><!\[CDATA["+textArea.initValue+"\]\]></initValue>";
+						xmlStr += "<dataType>"+textArea.dataType+"</dataType>";
+						xmlStr += "<dataDisplaySize>"+textArea.dataDisplaySize+"</dataDisplaySize>";
+						xmlStr += "<textAlign>"+(textArea.textAlign==null?"":textArea.textAlign)+"</textAlign>";
+						xmlStr += "<customScript><!\[CDATA["+(textArea.customScript==null?"":textArea.customScript)+"\]\]></customScript>";
+						xmlStr += "<backgroundColor>"+textArea.contentBackgroundColor+"</backgroundColor>";
+						xmlStr += "<fontColor>"+textArea.fontColor+"</fontColor>";
+						xmlStr += "</ui>";
+						
+					}else if(t_do is STButton){
+						var button:STButton = t_do as STButton;
+						xmlStr += "<ui name='button'>";
+						xmlStr += "<id>"+button.buttonId+"</id>";
+						xmlStr += "<width>"+button.width+"</width>";
+						xmlStr += "<height>"+button.height+"</height>";
+						xmlStr += "<label><!\[CDATA["+button.label+"\]\]></label>";
+						xmlStr += "<disabled>"+button.disabled+"</disabled>";
+						xmlStr += "<hidden>"+button.hidden+"</hidden>";
+						xmlStr += "<x>"+button.x+"</x>";
+						xmlStr += "<y>"+button.y+"</y>";
+						xmlStr += "<textAlign>"+(button.textAlign==null?"":button.textAlign)+"</textAlign>";
+						xmlStr += "<btnType>"+button.btnType+"</btnType>";
+						xmlStr += "<customScript><!\[CDATA["+(button.customScript==null?"":button.customScript)+"\]\]></customScript>";
+						xmlStr += "<backgroundColor>"+button.chromeColor+"</backgroundColor>";
+						xmlStr += "<fontColor>"+button.fontColor+"</fontColor>";
+						xmlStr += "</ui>";
+					}else if(t_do is STImage){
+						var image:STImage = t_do as STImage;
+						xmlStr += "<ui name='image'>";
+						xmlStr += "<id>"+image.imageId+"</id>";
+						xmlStr += "<width>"+image.width+"</width>";
+						xmlStr += "<height>"+image.height+"</height>";
+						xmlStr += "<title><!\[CDATA["+image.title+"\]\]></title>";
+						xmlStr += "<hidden>"+image.hidden+"</hidden>";
+						xmlStr += "<x>"+image.x+"</x>";
+						xmlStr += "<y>"+image.y+"</y>";
+						xmlStr += "<customScript><!\[CDATA["+(image.customScript==null?"":image.customScript)+"\]\]></customScript>";
+						xmlStr += "<src>"+image.src+"</src>";
+						xmlStr += "<autoWH>"+image.autoWH+"</autoWH>";
+						xmlStr += "</ui>";
+					}else if(t_do is STCheckBox){
+						var stCheckBox:STCheckBox = t_do as STCheckBox;
+						xmlStr += "<ui name='checkBox'>";
+						xmlStr += "<id>"+stCheckBox.checkBoxId+"</id>";
+						xmlStr += "<width>"+stCheckBox.width+"</width>";
+						xmlStr += "<height>"+stCheckBox.height+"</height>";
+						xmlStr += "<label><!\[CDATA["+stCheckBox.label+"\]\]></label>";
+						xmlStr += "<disabled>"+stCheckBox.disabled+"</disabled>";
+						xmlStr += "<hidden>"+stCheckBox.hidden+"</hidden>";
+						xmlStr += "<isNeed>"+stCheckBox.isNeed+"</isNeed>";
+						xmlStr += "<x>"+stCheckBox.x+"</x>";
+						xmlStr += "<y>"+stCheckBox.y+"</y>";
+						xmlStr += "<selected>"+stCheckBox.selected+"</selected>";
+						xmlStr += "<selectedAllChild>"+stCheckBox.selectedAllChild+"</selectedAllChild>";
+						xmlStr += "<childPropertie>"+stCheckBox.childPropertie+"</childPropertie>";
+						xmlStr += "<otherChildPropertie>"+stCheckBox.otherChildPropertie+"</otherChildPropertie>";
+						
+						xmlStr += "<name>"+stCheckBox.checkBoxName+"</name>";
+						xmlStr += "<readonly>"+stCheckBox.readonly+"</readonly>";
+						xmlStr += "<source>"+stCheckBox.source+"</source>";
+						xmlStr += "<field>"+stCheckBox.field+"</field>";
+						xmlStr += "<initValue>"+stCheckBox.initValue+"</initValue>";
+						xmlStr += "<selectValue><!\[CDATA["+stCheckBox.selectValue+"\]\]></selectValue>";
+						xmlStr += "<dataType>"+stCheckBox.dataType+"</dataType>";
+						xmlStr += "<dataDisplaySize>"+stCheckBox.dataDisplaySize+"</dataDisplaySize>";
+						xmlStr += "<customScript><!\[CDATA["+(stCheckBox.customScript==null?"":stCheckBox.customScript)+"\]\]></customScript>";
+						xmlStr += "<backgroundColor>"+stCheckBox.chromeColor+"</backgroundColor>";
+						xmlStr += "<fontColor>"+stCheckBox.fontColor+"</fontColor>";
+						xmlStr += "</ui>";
+					}else if(t_do is STCombobox){
+						var stcomboBox:STCombobox = t_do as STCombobox;
+						xmlStr += "<ui name='comboBox'>";
+						xmlStr += "<id>"+stcomboBox.comboBoxId+"</id>";
+						xmlStr += "<width>"+stcomboBox.width+"</width>";
+						xmlStr += "<height>"+stcomboBox.height+"</height>";
+						xmlStr += "<disabled>"+stcomboBox.disabled+"</disabled>";
+						xmlStr += "<hidden>"+stcomboBox.hidden+"</hidden>";
+						xmlStr += "<isNeed>"+stcomboBox.isNeed+"</isNeed>";
+						xmlStr += "<x>"+stcomboBox.x+"</x>";
+						xmlStr += "<y>"+stcomboBox.y+"</y>";
+						xmlStr += "<hidden>"+stcomboBox.hidden+"</hidden>";
+						xmlStr += "<name>"+stcomboBox.comboBoxName+"</name>";
+						xmlStr += "<readonly>"+stcomboBox.readonly+"</readonly>";
+						xmlStr += "<source>"+stcomboBox.source+"</source>";
+						xmlStr += "<field>"+stcomboBox.field+"</field>";
+						xmlStr += "<initValue>"+stcomboBox.initValue+"</initValue>";
+						xmlStr += "<selectValue><!\[CDATA["+stcomboBox.selectValue+"\]\]></selectValue>";
+						xmlStr += "<dataType>"+stcomboBox.dataType+"</dataType>";
+						xmlStr += "<dataDisplaySize>"+stcomboBox.dataDisplaySize+"</dataDisplaySize>";
+						xmlStr += "<textAlign>"+(stcomboBox.textAlign==null?"":stcomboBox.textAlign)+"</textAlign>";
+						xmlStr += "<customScript><!\[CDATA["+(stcomboBox.customScript==null?"":stcomboBox.customScript)+"\]\]></customScript>";
+						xmlStr += "<backgroundColor>"+stcomboBox.chromeColor+"</backgroundColor>";
+						xmlStr += "<fontColor>"+stcomboBox.fontColor+"</fontColor>";
+						xmlStr += "</ui>";
+					}else if(t_do is STRadioButton){
+						var stRadioButton:STRadioButton = t_do as STRadioButton;
+						xmlStr += "<ui name='radioButton'>";
+						xmlStr += "<id>"+stRadioButton.radioButtonId+"</id>";
+						xmlStr += "<width>"+stRadioButton.width+"</width>";
+						xmlStr += "<height>"+stRadioButton.height+"</height>";
+						xmlStr += "<disabled>"+stRadioButton.disabled+"</disabled>";
+						xmlStr += "<hidden>"+stRadioButton.hidden+"</hidden>";
+						xmlStr += "<isNeed>"+stRadioButton.isNeed+"</isNeed>";
+						xmlStr += "<x>"+stRadioButton.x+"</x>";
+						xmlStr += "<y>"+stRadioButton.y+"</y>";
+						xmlStr += "<hidden>"+stRadioButton.hidden+"</hidden>";
+						xmlStr += "<name>"+stRadioButton.radioButtonName+"</name>";
+						xmlStr += "<readonly>"+stRadioButton.readonly+"</readonly>";
+						xmlStr += "<source>"+stRadioButton.source+"</source>";
+						xmlStr += "<field>"+stRadioButton.field+"</field>";
+						xmlStr += "<initValue>"+stRadioButton.initValue+"</initValue>";
+						xmlStr += "<selectValue><!\[CDATA["+stRadioButton.selectValue+"\]\]></selectValue>";
+						xmlStr += "<dataType>"+stRadioButton.dataType+"</dataType>";
+						xmlStr += "<dataDisplaySize>"+stRadioButton.dataDisplaySize+"</dataDisplaySize>";
+						xmlStr += "<textAlign>"+(stRadioButton.textAlign==null?"":stRadioButton.textAlign)+"</textAlign>";
+						xmlStr += "<customScript><!\[CDATA["+(stRadioButton.customScript==null?"":stRadioButton.customScript)+"\]\]></customScript>";
+						xmlStr += "<backgroundColor>"+stRadioButton.chromeColor+"</backgroundColor>";
+						xmlStr += "<fontColor>"+stRadioButton.fontColor+"</fontColor>";
+						xmlStr += "</ui>";
+					}
+				}
+				return xmlStr;
+			}
+
+
+			protected function xmlTextArea_changeHandler(event:Event):void
+			{
+				xmlTextArea_changeFlag=true;
+			}
+			/**
+			 * 取得数据源
+			 * */
+			public function getDataSourceByArrayCollection():ArrayCollection{
+				var dataSourceArray:ArrayCollection = new ArrayCollection();
+				for(var i:int=0;i<dataSourceArr.length;i++){
+					var obj:Object = dataSourceArr[i] as Object;
+					dataSourceArray.addItem({label:obj["name"],data:obj["name"],state:obj["state"],database:obj["database"]});
+				}
+				return dataSourceArray;
+			}
+			/**
+			 * 取得数据源字段
+			 * */
+			public function getFieldByXMLList(sourcename:String):XMLList{
+			
+				for(var i:int=0;i<treeXmlData.length;i++){
+					if(treeXmlData[i].attribute("name")==sourcename){
+						return (treeXmlData[i] as XML).children();
+					}
+				}
+				return null;
+			}
+			public function addLoading():void{
+				
+				PopUpManager.addPopUp(loading,parentDocument.hdbox, true);
+				PopUpManager.centerPopUp(loading); 
+			}
+			public function removeLoading():void{
+				
+				PopUpManager.removePopUp(loading);
+			}
+			
+			private function onJSONLoadByDataBase(event:ResultEvent):void  
+			{   
+				
+				try{
+					var rawData:String = String(event.result);  
+					var json :JSONDecoder = new JSONDecoder(rawData);
+					if(json.getObject().success==0){
+						Alert.show(json.getObject().errorMSG);
+					}else{
+						var array:Array = json.getObject().databases ;
+						for(var i:int=0;i<array.length;i++){
+							dataBaseArr.addItem({label:array[i].name, data:array[i].database});
+						}
+					}
+				}catch(e:*){
+					Alert.show("系统错误");
+				}
+				PopUpManager.removePopUp(loading);
+				
+			} 
+			private function onJSONLoadByWorkflow(event:ResultEvent):void  
+			{   
+				
+				try{
+					var rawData:String = String(event.result);  
+					var json :JSONDecoder = new JSONDecoder(rawData);
+					if(json.getObject().success==0){
+						Alert.show(json.getObject().errorMSG);
+					}else{
+						var array:Array = json.getObject().sys_workflows ;
+						workflowArr.addItem({label:'', data:''});
+						for(var i:int=0;i<array.length;i++){
+							workflowArr.addItem({label:array[i].proctype, data:array[i].id});
+						}
+					}
+				}catch(e:*){
+					Alert.show("系统错误");
+				}
+				PopUpManager.removePopUp(loading);
+				
+			}   
+			
+			public function DataBaseSend():void{
+				PopUpManager.addPopUp(loading,parentDocument.hdbox, true);
+				PopUpManager.centerPopUp(loading); 
+				serviceDatabase.url = config.webURL+"/SQLDataBase";
+				var params:Object = new Object();
+				params["time"] = new Date().date;
+				serviceDatabase.method="POST";
+				serviceDatabase.send(params);
+			}
+
+			protected function colorpicker1_changeHandler(event:ColorPickerEvent):void
+			{
+				//Alert.show(event+"");
+				if(selectBCP.value!=null){
+					setFocusBackgroundColor(selectBCP.value.toString(16));
+				}
+				selectBCP.selectedColor=0xFFFFFF;
+			}
+
+			protected function colorpicker1_keyDownHandler(event:KeyboardEvent):void
+			{
+				if(event.keyCode==13){
+					if(selectBCP.value!=null){
+						setFocusBackgroundColor(selectBCP.value.toString(16));
+					}
+				}
+				selectBCP.selectedColor=0xFFFFFF;
+			}
+
+
+			protected function selectCP_changeHandler(event:ColorPickerEvent):void
+			{
+				if(selectCP.value!=null){
+					setFocusColor(selectCP.value.toString(16));
+				}
+				selectCP.selectedColor=0x000000;
+				
+			}
+
+
+			protected function selectCP_keyDownHandler(event:KeyboardEvent):void
+			{
+				if(event.keyCode==13){
+					
+					if(selectCP.value!=null){
+						setFocusColor(selectCP.value.toString(16) );
+					}
+				}
+				selectCP.selectedColor=0x000000;
+			}
+			/**
+			 * 设定背景颜色
+			 * */
+			private function setFocusBackgroundColor(color:String):void{
+				
+				color = toHtmlColor(color);
+				//Alert.show(color)
+				if(focusObj is Table){
+					(focusObj as Table).selectedTdColor = color;
+				}else if(focusObj is InputLabel){
+					(focusObj as InputLabel).contentBackgroundColor =color;
+				}else if(focusObj is InputField){
+					(focusObj as InputField).contentBackgroundColor =color;
+				}else if(focusObj is components.TextArea){
+					(focusObj as components.TextArea).contentBackgroundColor =color;
+				}else if(focusObj is STButton){
+					(focusObj as STButton).chromeColor =color;
+				}else if(focusObj is STCheckBox){
+					(focusObj as STCheckBox).chromeColor =color;
+				}else if(focusObj is STRadioButton){
+					(focusObj as STRadioButton).chromeColor =color;
+				}else if(focusObj is STCombobox){
+					(focusObj as STCombobox).chromeColor =color;
+				}else{
+					htmlDesign.setStyle("backgroundColor",color);
+				}
+			}
+			/**
+			 * 设定字体颜色
+			 * */
+			private function setFocusColor(color:String):void{
+				color = toHtmlColor(color);
+				if(focusObj is Table){
+					//(focusObj as Table).selectedTdColor = color;
+				}else if(focusObj is InputLabel){
+					(focusObj as InputLabel).fontColor =color;
+				}else if(focusObj is InputField){
+					(focusObj as InputField).fontColor =color;
+				}else if(focusObj is components.TextArea){
+					(focusObj as components.TextArea).fontColor =color;
+				}else if(focusObj is STButton){
+					(focusObj as STButton).fontColor =color;
+				}else if(focusObj is STCheckBox){
+					(focusObj as STCheckBox).fontColor =color;
+				}else if(focusObj is STRadioButton){
+					(focusObj as STRadioButton).fontColor =color;
+				}else if(focusObj is STCombobox){
+					(focusObj as STCombobox).fontColor =color;
+				}else{
+					htmlDesign.setStyle("color",color);
+				}
+			}
+			private function toHtmlColor(color:String):String{
+				
+				var _str:String="000000"+color.toUpperCase();  
+				color = "0x"+_str.substr(_str.length-6);
+				return color;
+			}
+
+
+			protected function icons_clickHandler(event:MouseEvent):void
+			{
+				if(icons.selectedItem==null || icons.selectedItem.iconName=="select"){
+					CursorManager.removeAllCursors();
+				}else{
+					this.addTool(0,0);
+				}
+			}
+			private function removeCursor(){
+				this.icons_clickHandler(null);
+			}
+
+			protected function customScriptKindId_changeHandler(event:ListEvent):void
+			{
+				if(customScriptKindId.selectedItem.data=="1"){
+					customSourceTextArea.visible=true;
+					ListCustomSourceTextArea.visible=false;
+				}else{
+					
+					customSourceTextArea.visible=false;
+					ListCustomSourceTextArea.visible=true;
+				}
+			}
+			
+			public function WordflowsSend():void{
+				
+				wordflows.url = config.webURL+"/SQLWordflows";
+				var params:Object = new Object();
+				params["time"] = new Date().date;
+				wordflows.method="POST";
+				wordflows.send(params);
+			}
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+		<mx:HTTPService id="dataSourceTreeXML" resultFormat="text"  fault="service_faultHandler(event)"
+						url="http://localhost:8080/HSecurity/SQLDataSourceTreeXML"   
+						result="onJSONLoad(event)" />
+		<mx:HTTPService id="serviceDatabase" resultFormat="text"  fault="service_faultHandler(event)"
+						url="http://localhost:8080/HSecurity/SQLDataBase"   
+						result="onJSONLoadByDataBase(event)" />
+		<mx:HTTPService id="wordflows" resultFormat="text"  fault="service_faultHandler(event)"
+						url="http://localhost:8080/HSecurity/SQLWordflows"   
+						result="onJSONLoadByWorkflow(event)" />
+	</fx:Declarations>
+	
+	<mx:HDividedBox y="0" width="100%" height="100%" id="hdbox">
+		<mx:VBox id="vbox" verticalGap="0" width="100%" height="100%" >
+			
+			<mx:HBox id="buttonCanvas" width="100%" height="40" borderStyle="solid" backgroundColor="0xffffff">
+				<mx:Image source="@Embed('../asserts/remove_disabled.png')" id= "remove" toolTip="删除" useHandCursor="true" buttonMode="true"/>
+				<mx:Image source="@Embed('../asserts/mergecell_disabled.png')" id="mergecell"  toolTip="合并单元格" useHandCursor="true" buttonMode="true"/>
+				<mx:Image source="@Embed('../asserts/splitcell_disabled.png')" id="splitcell"  toolTip="拆分单元格" useHandCursor="true" buttonMode="true" />
+				<mx:Image source="@Embed('../asserts/inserttop_disabled.png')" id="addrowup"  toolTip="向上添加一行" useHandCursor="true" buttonMode="true" />
+				<mx:Image source="@Embed('../asserts/insertbottom_disabled.png')" id="addrowdown"  toolTip="向下添加一行" useHandCursor="true" buttonMode="true" />
+				<mx:Image source="@Embed('../asserts/insertcellleft_disabled.png')" id="addcellleft"  toolTip="向左添加一列" useHandCursor="true" buttonMode="true" />
+				<mx:Image source="@Embed('../asserts/insertcell_disabled.png')" id="addcellright"  toolTip="向右添加一列" useHandCursor="true" buttonMode="true" />
+				<mx:Image source="@Embed('../asserts/deleterow_disabled.png')" id="deleterow"  toolTip="删除当前行" useHandCursor="true" buttonMode="true" />
+				<mx:Image source="@Embed('../asserts/deletecell_disabled.png')" id="deletecell"  toolTip="删除当前列" useHandCursor="true" buttonMode="true" />
+				<mx:Image source="@Embed('../asserts/undo.png')" id="undo" click="redoAndUndo(1)"  toolTip="撤消" useHandCursor="true" buttonMode="true" />
+				<mx:Image source="@Embed('../asserts/redo.png')" id="redo" click="redoAndUndo(2)"  toolTip="重做" useHandCursor="true" buttonMode="true" />
+				
+				<mx:Canvas height="30">
+					<mx:Label x="0" y="10" text="背景色："/>
+					<mx:ColorPicker id="selectBCP"  x="50" y="4" selectedColor="0xffffff" change="colorpicker1_changeHandler(event)" keyDown="colorpicker1_keyDownHandler(event)"/>
+				</mx:Canvas>
+				<mx:Canvas height="30">
+					<mx:Label x="0" y="10" text="字体色："/>
+					<mx:ColorPicker id="selectCP" x="50" y="4" selectedColor="0x000000"  change="selectCP_changeHandler(event)" keyDown="selectCP_keyDownHandler(event)"/>
+				</mx:Canvas>
+				<mx:Canvas height="30">
+					<mx:Label text="版本号：" x="4"  y="10"/>
+					<mx:TextInput  x="56" y="5" width="40" id="versionText" text="1"/>
+				</mx:Canvas>
+				<mx:Canvas height="30">
+					<mx:Label text="宽：" x="4"  y="10"/>
+					<mx:TextInput  x="31" y="5" width="50" id="widthText" maxChars="4" restrict="[0-9]+%/^" text="800"/>
+				</mx:Canvas>
+				<mx:Canvas height="30">
+					<mx:Label text="高：" x="4"  y="10"/>
+					<mx:TextInput  x="31" y="5" width="50" id="heightText" maxChars="4" restrict="[0-9]+%/^"  text="600"/>
+				</mx:Canvas>
+				<mx:Canvas height="30">
+					<mx:Label text="关联流程：" x="4"  y="10"/>
+					<s:ComboBox  x="60" y="6" id="workflowid" dataProvider="{workflowArr}"/>
+				</mx:Canvas>
+			</mx:HBox>
+			<s:TabBar x="48" y="10" dataProvider="{viewstack1}"/>
+			<mx:ViewStack x="48" y="34" id="viewstack1" width="100%" height="90%" change="viewstack1_changeHandler(event)" >
+				
+				<mx:VBox id="viewId" label="设计" width="100%" height="100%"
+						 >
+					<mx:Canvas id="htmlDesign" width="100%" height="100%" borderStyle="solid" backgroundColor="0xffffff">
+						
+					</mx:Canvas>
+				</mx:VBox>
+				
+				<!--<mx:Canvas id="htmlSource" width="100%" height="100%" label="HTML" >
+					<mx:TextArea fontSize="14" x="0" y="0" width="100%" height="100%" id="xmlHTML" />
+				</mx:Canvas>-->
+				<mx:Canvas id="xmlSource" width="100%" height="100%" label="XML">
+					<mx:TextArea fontSize="14" x="0" y="0" width="100%" height="100%" id="xmlTextArea" change="xmlTextArea_changeHandler(event);" />
+				</mx:Canvas>
+				<mx:Canvas id="customSource" width="100%" height="100%" label="自定义JAVA代码">
+					<mx:Canvas width="100%" height="100%" borderStyle="solid" backgroundColor="0xffffff">
+						<mx:ComboBox y="4" dataProvider="{customScriptKind}" id="customScriptKindId" change="customScriptKindId_changeHandler(event)"/>
+						<mx:TextArea fontSize="14" x="0" y="25" width="100%" height="100%" visible="true"  id="customSourceTextArea" change="xmlTextArea_changeHandler(event);" />
+						<mx:TextArea fontSize="14" x="0" y="25" width="100%" height="100%" visible="false" id="ListCustomSourceTextArea" change="xmlTextArea_changeHandler(event);"/>
+					</mx:Canvas>
+				</mx:Canvas>
+				<mx:Canvas id="viewSet" width="100%" height="100%" label="显示列表定义">
+					<mx:Canvas width="100%" height="100%" borderStyle="solid" backgroundColor="0xffffff">
+						<sub:ViewManager id="viewManager"  width="100%" height="100%"/>
+					</mx:Canvas>
+				</mx:Canvas>
+			</mx:ViewStack>
+			
+		</mx:VBox>
+		<mx:VDividedBox height="100%" width="271">
+			<mx:Panel  width="100%" height="20%" layout="absolute" title="添加组件">
+				<mx:TileList id="icons" doubleClickEnabled="true" x="0" y="0" width="100%" height="100%" click="icons_clickHandler(event)"
+							 columnWidth="60"	rowHeight="70"					 
+							 >
+					
+					<fx:Object  label="选择" icon="@Embed('../asserts/select.png')" iconName="select"></fx:Object>
+					<fx:Object  label="表格" icon="@Embed('../asserts/table.png')" iconName="table"></fx:Object>
+					<fx:Object  label="DataGrid" icon="@Embed('../asserts/table.png')" iconName="DataGrid"></fx:Object>
+					<fx:Object  label="标签" icon="@Embed('../asserts/label.png')" iconName="label"></fx:Object>
+					<fx:Object  label="输入框" icon="@Embed('../asserts/inputField.png')" iconName="inputField"></fx:Object>
+					<fx:Object  label="多行输入" icon="@Embed('../asserts/textArea.png')" iconName="textArea"></fx:Object>
+					<fx:Object  label="按钮" icon="@Embed('../asserts/button.png')" iconName="button"></fx:Object>
+					<fx:Object  label="单选框" icon="@Embed('../asserts/radiobutton.png')" iconName="radioButton"></fx:Object>
+					<fx:Object  label="多选框" icon="@Embed('../asserts/checkBox.png')" iconName="checkBox"></fx:Object>
+					<fx:Object  label="下拉框" icon="@Embed('../asserts/combobox.png')" iconName="comboBox"></fx:Object>
+					<fx:Object  label="图片" icon="@Embed('../asserts/image.png')" iconName="image"></fx:Object>
+				</mx:TileList>
+			</mx:Panel>
+			<dsp:DataSourcePanel  width="100%" height="5%" layout="absolute"  id="panelDataSource" title="数据源">
+				<mx:Tree id="dataSourceTree" x="0" y="0" width="100%" height="100%" labelField="@name"></mx:Tree>
+				
+			</dsp:DataSourcePanel>
+			<mx:Panel title="属性对话框" width="100%" >
+				<mx:DataGrid id="dgProp" width="100%" height="100%" editable="true"  itemEditEnd="onGridEditEnd(event)" >
+					<mx:columns>
+						<mx:DataGridColumn sortable="false" headerText="名称" width="80" dataField="name" editable="false"/>
+						<mx:DataGridColumn sortable="false" headerText="值" dataField="value" wordWrap="true">
+							<mx:itemEditor>
+								<fx:Component>
+									<mx:HBox horizontalScrollPolicy="off">
+										<fx:Script>
+											<![CDATA[
+												import mx.collections.ArrayCollection;
+												import mx.controls.Alert;
+												import mx.controls.ComboBox;
+												import mx.controls.TextInput;
+												import mx.events.FlexEvent;
+												import mx.events.ListEvent;
+												import mx.managers.PopUpManager;
+												import mx.states.AddChild;
+												
+												import spark.events.TextOperationEvent;
+												
+												import sub.ComboGridManager;
+												import sub.CustomView;
+												import sub.DataSourceAdd;
+												import sub.InitValueManager;
+												import sub.SelectValueManager;
+												private var t_Obj:Object;
+												public function get text():Object{
+													if(t_Obj.id=="dataType" || t_Obj.id=="source"  || t_Obj.id=="textAlign" 
+														|| t_Obj.id=="hidden" || t_Obj.id=="disabled" 
+														|| t_Obj.id=="readonly"   || t_Obj.id=="selected" 
+														|| t_Obj.id=="selectedAllChild"  || t_Obj.id=="btnType" || t_Obj.id=="isDataGridDetail"
+														|| t_Obj.id=="isType"
+														|| t_Obj.id=="isNeed"
+														|| t_Obj.id=="autoWH"){
+														if(comboBox.selectedItem == null){
+															return null;
+														}
+														var iterm :Object = comboBox.selectedItem as Object;
+														return iterm.data;
+													}else if(t_Obj.id=="field"){
+														
+														if(comboBox.selectedItem == null){
+															return null;
+														}
+														var iterm :Object = comboBox.selectedItem as Object;
+														return iterm.@name;	
+													}else{
+														return textInput.text;
+													}
+												}
+												
+												override public function set data(value:Object):void{
+													super.data = value;
+													this.t_Obj = value;
+													if(t_Obj.id=="dataType" || t_Obj.id=="source"  || t_Obj.id=="field"  
+														|| t_Obj.id=="textAlign" 
+														|| t_Obj.id=="hidden" || t_Obj.id=="disabled" 
+														|| t_Obj.id=="readonly" || t_Obj.id=="selected" 
+														|| t_Obj.id=="selectedAllChild" || t_Obj.id=="btnType"  || t_Obj.id=="isDataGridDetail"
+														|| t_Obj.id=="isType"
+														|| t_Obj.id=="isNeed"
+														|| t_Obj.id=="autoWH"){
+														currentState = "comboBoxState";
+													}else{
+														currentState = "textInputState";
+													}
+												}
+
+												protected function state1_enterStateHandler(event:FlexEvent):void
+												{
+													//给combobox赋初始值
+													if(t_Obj.id=="dataType"){
+														comboBox.dataProvider = outerDocument.dataType;
+														comboBox.labelField = "label";
+													}else if(t_Obj.id=="source"){
+														comboBox.dataProvider = outerDocument.getDataSourceByArrayCollection();
+														comboBox.labelField = "label";
+													}else if(t_Obj.id=="textAlign"){
+														comboBox.dataProvider = outerDocument.alignData;
+														comboBox.labelField = "label";
+													}else if(t_Obj.id=="hidden" || t_Obj.id=="disabled" 
+														|| t_Obj.id=="readonly"  || t_Obj.id=="selected" 
+														|| t_Obj.id=="selectedAllChild"  || t_Obj.id=="isDataGridDetail"
+														|| t_Obj.id=="isNeed"
+														|| t_Obj.id=="autoWH"){
+														comboBox.dataProvider = outerDocument.booleanData;
+														comboBox.labelField = "label";
+													}else if(t_Obj.id=="btnType"){
+														comboBox.dataProvider = outerDocument.btnTypeData;
+														comboBox.labelField = "label";
+													}else if(t_Obj.id=="field"){
+														var source = outerDocument.getPropertie("source");
+														
+														comboBox.dataProvider = outerDocument.getFieldByXMLList(source);
+														comboBox.labelField="@name";
+													}else if(t_Obj.id=="isType"){
+														comboBox.dataProvider = outerDocument.isTypeData;
+														comboBox.labelField = "label";
+													}
+													
+													comboBox.selectedIndex=-1;
+													for each(var iterm:Object in comboBox.dataProvider){
+														var dataType:String = iterm.data;
+														if(t_Obj.id=="field"){
+															dataType = iterm.@name;
+														}
+														//var value: String = tf.text;
+														if(dataType+"" == t_Obj.value+""){
+															comboBox.selectedItem = iterm;
+														}
+													}
+													if(t_Obj.id=="isType" && comboBox.selectedItem.data=="comboGrid"){
+														comboBoxSubBtn.visible=true;
+													}else{
+														comboBoxSubBtn.visible=false;
+													}
+												}
+												protected function state2_enterStateHandler(event:FlexEvent):void
+												{
+													textInput.text = t_Obj.value;
+													textInput.selectAll();
+													textInput.setFocus();
+													
+													if(t_Obj.id=="initValue" || t_Obj.id=="selectValue" || t_Obj.id=="customScript"){
+														subBtn.visible=true;
+													}else{
+														
+														subBtn.visible=false;
+													}
+												}
+
+
+												protected function textInput_changeHandler(event:*):void
+												{
+													
+													//if((t_Obj.id=="hidden" || t_Obj.id=="disabled" || t_Obj.id=="readonly") && textInput.text!="true"){
+													//	textInput.text="false";
+													//}
+													t_Obj.value = textInput.text;
+													outerDocument.onGridEdit(t_Obj);
+													
+												}
+
+
+												protected function dataTypeComboBox_changeHandler(event:ListEvent):void
+												{
+													if(t_Obj.id=="source"){
+														if(comboBox.selectedItem != null){
+															outerDocument.setPropertie("dataType","");
+															outerDocument.setPropertie("dataDisplaySize","");
+															outerDocument.setPropertie("source",comboBox.selectedItem.data)
+															outerDocument.setPropertie("field","");
+															outerDocument.setPropertie("name","");
+															outerDocument.onGridEditByProperties();
+														}
+													}else if(t_Obj.id=="field"){
+														
+														if(comboBox.selectedItem != null){
+															var iterm :Object = comboBox.selectedItem as Object;
+															outerDocument.setPropertie("dataType",iterm.@dataType);
+															outerDocument.setPropertie("dataDisplaySize",iterm.@dataDisplaySize);
+															outerDocument.setPropertie("field",iterm.@name);
+															outerDocument.setPropertie("name",iterm.@source+"_"+iterm.@name);
+															
+															outerDocument.onGridEditByProperties();
+														}
+													}else{
+														//trace("-------"+t_Obj.data);
+														outerDocument.setPropertie(t_Obj.id,comboBox.selectedItem.data)
+														outerDocument.onGridEdit(t_Obj);
+													}
+													outerDocument.dgProp.invalidateList();
+													
+													
+													if(t_Obj.id=="isType" && comboBox.selectedItem.data=="comboGrid"){
+														comboBoxSubBtn.visible=true;
+													}else{
+														comboBoxSubBtn.visible=false;
+													}
+												}
+
+
+
+												protected function subBtn_clickHandler(event:MouseEvent):void
+												{
+													if(t_Obj.id=="initValue" ){
+														
+														var dsa:InitValueManager = new InitValueManager();
+														dsa.t_Obj = t_Obj;
+														dsa.formDesign = outerDocument;
+														
+														PopUpManager.addPopUp(dsa, outerDocument.hdbox, true); 
+														PopUpManager.centerPopUp(dsa); 
+													}else if(t_Obj.id=="selectValue"){
+														outerDocument.DataBaseSend();
+														var dsaSelect:SelectValueManager = new SelectValueManager();
+														dsaSelect.t_Obj = t_Obj;
+														dsaSelect.formDesign = outerDocument;
+														PopUpManager.addPopUp(dsaSelect, outerDocument.hdbox, true); 
+														PopUpManager.centerPopUp(dsaSelect); 
+													}else if(t_Obj.id=="customScript"){
+														//outerDocument.DataBaseSend();
+														var dsaCustomScript:CustomView = new CustomView();
+														dsaCustomScript.t_Obj = t_Obj;
+														dsaCustomScript.formDesign = outerDocument;
+														PopUpManager.addPopUp(dsaCustomScript, outerDocument.hdbox, true); 
+														PopUpManager.centerPopUp(dsaCustomScript); 
+													}
+													
+												}
+
+
+												protected function comboBoxSubBtn_clickHandler(event:MouseEvent):void
+												{
+													
+													var comboGrid:ComboGridManager = new ComboGridManager();
+													comboGrid.formDesign = outerDocument;
+													PopUpManager.addPopUp(comboGrid, outerDocument.hdbox, true); 
+													PopUpManager.centerPopUp(comboGrid); 
+												}
+
+											]]>
+										</fx:Script>
+										<mx:states>
+											<s:State name="textInputState" enterState="state2_enterStateHandler(event)" />
+											<s:State name="comboBoxState" enterState="state1_enterStateHandler(event)"/>
+										</mx:states>
+										<s:TextInput id="textInput" width="100%" includeIn="textInputState" focusOut="textInput_changeHandler(event)"/>
+										<s:Button id="subBtn" label="..." right="0" includeIn="textInputState" visible="false" width="30" click="subBtn_clickHandler(event)"/>
+										<mx:ComboBox id="comboBox" width="100%" includeIn="comboBoxState" change="dataTypeComboBox_changeHandler(event)" />
+										<s:Button id="comboBoxSubBtn" label="..." right="0" includeIn="comboBoxState" visible="false" width="30" click="comboBoxSubBtn_clickHandler(event)"/>
+									</mx:HBox>
+								</fx:Component>
+							</mx:itemEditor>
+						
+						</mx:DataGridColumn>
+					</mx:columns>
+					<mx:dataProvider >
+						{properties}    
+					</mx:dataProvider>
+				</mx:DataGrid>
+			</mx:Panel>
+		</mx:VDividedBox>
+	</mx:HDividedBox>
+	
+	
+</s:Application>

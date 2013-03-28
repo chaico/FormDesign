@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8" ?>  
+<config>
+	<webURL>
+		http://localhost:8080/HSecurity/
+	</webURL>
+	<sources>
+		<source name="SEQ" remark="从数据库中取得序列,如:SEQ(userinfo_seq)"/>
+		<source name="sysIndex" remark="从1开始自动增长"/>
+		<source name="sysQXH" remark="区县号"/>
+		<source name="sysLoginUserid" remark="登录用户ID"/>
+	</sources>
+</config>

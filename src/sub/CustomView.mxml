@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="566" height="450" creationComplete="init()">
+	<s:layout>
+		<s:BasicLayout/>
+	</s:layout>
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			public var viewManager:ViewManager;
+			public var formDesign:FormDesign;
+			public var t_Obj:Object;
+			private var comboxData = new ArrayCollection([
+				{label:"",data:''},
+				{label:"click()		点击事件",data:'click'},
+				{label:"change()		变更事件",data:'change'},
+				{label:"dblclick()		双击事件",data:'dblclick'},
+				{label:"blur()			离开焦点事件",data:'blur'},
+				{label:"focus()		获取焦点事件",data:'focus'},
+				{label:"keydown()		键盘按下事件",data:'keydown'},
+				{label:"keypress()		键盘按下事件",data:'keypress'},
+				{label:"keyup()		键盘按下并释放事件",data:'keyup'},
+				{label:"mousedown()	鼠标按下事件",data:'mousedown'},
+				{label:"mousemove()	鼠标移动事件",data:'mousemove'},
+				{label:"mouseout()		鼠标离开事件",data:'mouseout'},
+				{label:"mouseover()	鼠标获取事件",data:'mouseover'},
+				{label:"mouseup()		鼠标按下并释放事件",data:'mouseup'}]);
+			private function init():void{
+				titleWindow.addEventListener(CloseEvent.CLOSE, titleWindow_close);
+				titleWindow.isPopUp = true;
+				addEventListener(FlexEvent.UPDATE_COMPLETE,function():void{
+					if(formDesign!=null){
+						customText.text =  t_Obj.value;
+					}else{
+						customText.text = t_Obj.custom;
+					}
+				});
+			}
+			//关闭弹出对话框
+			private function titleWindow_close(event:CloseEvent=null):void { 
+				PopUpManager.removePopUp(this); 
+			} 
+			protected function okBtn_clickHandler(event:MouseEvent):void
+			{
+				if(formDesign!=null){
+					
+					formDesign.setPropertie(t_Obj.id,customText.text)
+					formDesign.onGridEdit(t_Obj);
+					
+					formDesign.dgProp.invalidateList();
+				}else{
+					
+					t_Obj.custom = customText.text;
+					viewManager.filedDataGrid.invalidateList();
+				}
+				this.titleWindow_close(null);
+			}
+			
+			
+			protected function cancelBtn_clickHandler(event:MouseEvent):void
+			{
+				this.titleWindow_close(null);
+			}
+
+
+			protected function helpBtn_clickHandler(event:MouseEvent):void
+			{
+				helpTextArea.visible=true;
+			}
+
+
+			protected function customText_clickHandler(event:MouseEvent):void
+			{
+				helpTextArea.visible=false;
+			}
+
+
+			protected function customText_focusInHandler(event:FocusEvent):void
+			{
+				
+				IME.enabled=true;
+			}
+
+
+			protected function addEvent_changeHandler(event:ListEvent):void
+			{
+				var script:String =""; 
+				script +="$(me)."+addEvent.selectedItem.data+"(function (){\n";
+				script +="//添加自定义代码\t\n";
+				script +="});\n";
+				if(customText.text==""){
+					customText.text = script;
+				}else{					
+					customText.text = customText.text +"\n"+script;
+				}
+			}
+
+		]]>
+	</fx:Script>
+	<s:TitleWindow x="0" y="0" width="100%" height="100%" title="自定义显示" id ="titleWindow">
+		<s:TextArea id="customText" x="0" y="0" width="100%" height="392" click="customText_clickHandler(event)" focusIn="customText_focusInHandler(event)"/>
+		<s:Button  x="10" y="394" id="helpBtn" label="help?"  width="63" click="helpBtn_clickHandler(event)">
+			
+		</s:Button>
+		<s:TextArea editable="false" id="helpTextArea" visible="false" height="155"  textAlign="left" width="361" x="10" y="231" text=" //me;为当前对象  &#xd;如：alert($(me).html());可取得当前的HTML值">
+			
+		</s:TextArea>
+		<s:Button x="397" y="394" label="确定" id="okBtn" click="okBtn_clickHandler(event)"/>
+		<s:Button x="475" y="394" label="取消" id="cancelBtn" click="cancelBtn_clickHandler(event)"/>
+		<mx:ComboBox x="140" y="394" dataProvider="{comboxData}" labelField="label" id="addEvent" change="addEvent_changeHandler(event)"/>
+		<s:Label x="81" y="398" text="添加事件："/>
+	</s:TitleWindow>
+</s:Group>

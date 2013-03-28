@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="650" height="370"  creationComplete="init()">
+	<s:layout>
+		<s:BasicLayout/>
+	</s:layout>
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.serialization.json.JSONDecoder;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.events.DataGridEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.events.StateChangeEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			import sys.Config;
+			public var dataSourceArr:Array=new Array();
+			public var formDesign:FormDesign;
+			private var modifyFlag:Boolean;
+			private function init():void{
+				titleWindow.addEventListener(CloseEvent.CLOSE, titleWindow_close);
+				//dataSourceArr = formDesign.dataSourceArr;
+				dataSourceArr = formDesign.dataSourceArr.concat();
+				this.loadData();
+				event();
+				titleWindow.isPopUp = true;
+			}
+			private function event():void{
+			}
+			//关闭弹出对话框
+			private function titleWindow_close(event:CloseEvent=null):void { 
+				PopUpManager.removePopUp(this); 
+			} 
+
+			public function getDataSource():void{
+				this.loadData();
+			}
+
+			protected function loadData(event:MouseEvent=null):void
+			{
+				var xmlData:XML = XML(formDesign.getDataSourceArr2XML(dataSourceArr));
+				t_dataGrid.dataProvider = xmlData.children();
+				deleteBtn.enabled=false;
+				upMoveBtn.enabled=false;
+				downMoveBtn.enabled=false;
+				dbbindBtn.enabled=false;
+				modifyBtn.enabled=false;
+			}
+			
+			protected function okBtn_clickHandler(event:MouseEvent):void
+			{
+				var main:Boolean=false;
+				for(var i:int=0;i<dataSourceArr.length;i++){
+					if(dataSourceArr[i]["main"]=="1"){
+						main= true;
+						break;
+					}
+				}
+				if(!main){
+					Alert.show("没有主表!","提示");
+					//return;
+				}
+				formDesign.dataSourceArr =dataSourceArr.concat();
+				formDesign.getDataSourceTree();
+				this.titleWindow_close();
+			}
+
+			protected function cancelBtn_clickHandler(event:MouseEvent):void
+			{
+				this.titleWindow_close();
+			}
+
+
+
+			protected function t_dataGrid_changeHandler(event:ListEvent):void
+			{
+				deleteBtn.enabled=true;
+				modifyBtn.enabled=true;
+				if(dataSourceArr.length==1){
+					upMoveBtn.enabled=false;
+					downMoveBtn.enabled=false;
+					dbbindBtn.enabled=false;
+				}else{
+					upMoveBtn.enabled=true;
+					downMoveBtn.enabled=true;
+					dbbindBtn.enabled=true;
+				}
+				if(dataSourceArr[t_dataGrid.selectedIndex]["main"]=="1"){
+					dbbindBtn.enabled=false;
+				}
+				if(dataSourceArr[t_dataGrid.selectedIndex]["state"]!="tableState"){
+					dbbindBtn.enabled=false;
+				}
+			}
+
+
+			protected function deleteBtn_clickHandler(event:MouseEvent):void
+			{
+				if(t_dataGrid.selectedIndex!=-1){
+					dataSourceArr.splice(t_dataGrid.selectedIndex,1);
+					this.loadData();
+				}
+			}
+
+
+			protected function upMoveBtn_clickHandler(event:MouseEvent):void
+			{
+				if(t_dataGrid.selectedIndex==0){
+					return;
+				}
+				var selectedIndex:Number = t_dataGrid.selectedIndex;
+				var dataArrTmp:Array = new Array();
+				for(var i:int=0;i<dataSourceArr.length;i++){
+					if(i+1==t_dataGrid.selectedIndex){
+						dataArrTmp[dataArrTmp.length] = dataSourceArr[i+1];
+					}else if(i==t_dataGrid.selectedIndex){
+						dataArrTmp[dataArrTmp.length] = dataSourceArr[i-1];
+					}else{
+						dataArrTmp[dataArrTmp.length] = dataSourceArr[i];
+					}
+				}
+				dataSourceArr  = dataArrTmp;
+				this.loadData();
+				t_dataGrid.selectedIndex=selectedIndex-1;
+				this.t_dataGrid_changeHandler(null);
+			}
+
+
+			protected function downMoveBtn_clickHandler(event:MouseEvent):void
+			{
+				
+				if(t_dataGrid.selectedIndex==dataSourceArr.length-1){
+					return;
+				}
+				var selectedIndex:Number = t_dataGrid.selectedIndex;
+				var dataArrTmp:Array = new Array();
+				for(var i:int=0;i<dataSourceArr.length;i++){
+					if(i-1==t_dataGrid.selectedIndex){
+						dataArrTmp[dataArrTmp.length] = dataSourceArr[i-1];
+					}else if(i==t_dataGrid.selectedIndex){
+						dataArrTmp[dataArrTmp.length] = dataSourceArr[i+1];
+					}else{
+						dataArrTmp[dataArrTmp.length] = dataSourceArr[i];
+					}
+				}
+				dataSourceArr  = dataArrTmp;
+				this.loadData();
+				t_dataGrid.selectedIndex=selectedIndex+1;
+				this.t_dataGrid_changeHandler(null);
+			}
+			protected function addBtn_clickHandler(event:MouseEvent,modifyFlag:Boolean):void
+			{
+				this.modifyFlag =modifyFlag;
+				//if(dataBaseArr.length==0){
+					//dataBaseArr.
+					//DataBaseSend();
+				//}else{
+					addDataSource(modifyFlag);
+				//}
+				
+			}
+			private function addDataSource(modifyFlag:Boolean):void{
+				var dsa:DataSourceAdd = new DataSourceAdd();
+				dsa.dataBaseArr = formDesign.dataBaseArr;
+				dsa.dataSourceManager =this;
+				PopUpManager.addPopUp(dsa, this, true); 
+				PopUpManager.centerPopUp(dsa); 
+				if(modifyFlag){
+					var obj: Object = dataSourceArr[t_dataGrid.selectedIndex];
+					dsa.initModify(obj,t_dataGrid.selectedIndex);
+				}
+			}
+			protected function dbbindBtn_clickHandler(event:MouseEvent):void
+			{
+				var DBDM:DBBindManager = new DBBindManager();
+				DBDM.dataSourceManager =this;
+				DBDM.followDatasourceObj = dataSourceArr[t_dataGrid.selectedIndex];
+				PopUpManager.addPopUp(DBDM, this, true); 
+				PopUpManager.centerPopUp(DBDM);				
+			}
+
+		]]>
+	</fx:Script>
+	<s:TitleWindow x="0" y="0" width="100%" height="100%" title="数据源管理" id="titleWindow">
+		<mx:DataGrid x="0" y="0" width="100%" height="308" id="t_dataGrid"   sortableColumns="false" 
+					 change="t_dataGrid_changeHandler(event)"
+					 >
+			<mx:columns>
+				<mx:DataGridColumn headerText="主表?" dataField="@mainName" width="50" />
+				<mx:DataGridColumn headerText="名称" dataField="name"/>
+				<mx:DataGridColumn headerText="数据库" dataField="databaseName" width="100"/>
+				<mx:DataGridColumn headerText="数据来源" dataField="stateName"  width="70"/>
+				<mx:DataGridColumn headerText="表\视图\自定义SQL" dataField="sqlvalue" width="200"/>
+			</mx:columns>
+		</mx:DataGrid>
+		<s:Button x="3" y="313" label="添加" id="addBtn" click="addBtn_clickHandler(event,false)" width="47"/>
+		<s:Button x="54" y="313" label="修改" id="modifyBtn" click="addBtn_clickHandler(event,true)" width="47" enabled="false"/>
+		<s:Button x="155" y="313" label="上移" width="47" id="upMoveBtn"  enabled="false" click="upMoveBtn_clickHandler(event)"/>
+		<s:Button x="205" y="313" label="下移" width="47" id="downMoveBtn"  enabled="false" click="downMoveBtn_clickHandler(event)"/>
+		<s:Button x="105" y="313" label="删除" width="47" id="deleteBtn"  enabled="false" click="deleteBtn_clickHandler(event)"/>
+		<s:Button x="255" y="313" label="关联字段..." id="dbbindBtn" enabled="false" click="dbbindBtn_clickHandler(event)"/>
+		<s:Button x="500" y="313" label="确定" id="okBtn" click="okBtn_clickHandler(event)"/>
+		<s:Button x="574" y="313" label="取消" id="cancelBtn" click="cancelBtn_clickHandler(event)"/>
+		
+	</s:TitleWindow>
+</s:Group>

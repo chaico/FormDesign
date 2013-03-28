@@ -1,0 +1,33 @@
+/* CSS file */
+@namespace s "library://ns.adobe.com/flex/spark";
+@namespace mx "library://ns.adobe.com/flex/mx";
+
+mx|Grid
+{
+	borderStyle: solid;
+	horizontalGap:-1;
+	verticalGap:-1;
+	paddingLeft:-1;
+	paddingTop:-1;
+	paddingRight:-1;
+	paddingBottom:-1;
+	background-color:white;
+	
+}
+
+mx|GridItem{
+	borderStyle: solid;
+	paddingTop:-1;
+	paddingBottom:-1;
+	background-color:white;
+
+}
+
+.textArea{
+	border-visible: true;
+	
+}
+.label{
+	border-visible: true;
+	
+}
